@@ -23,6 +23,10 @@ endif()
 add_executable(convergence_demo src/main.cpp)
 target_link_libraries(convergence_demo PRIVATE convergence)
 
+# Emits docs/convergence.csv, the data the project page is plotted from.
+add_executable(convergence_study tools/convergence_study.cpp)
+target_link_libraries(convergence_study PRIVATE convergence)
+
 enable_testing()
 add_executable(convergence_tests tests/test_convergence.cpp)
 target_link_libraries(convergence_tests PRIVATE convergence)

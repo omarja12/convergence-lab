@@ -1,0 +1,27 @@
+﻿series,resolution,error
+Binomial CRR,250,7.994859563640e-03
+Binomial CRR,500,3.998435739025e-03
+Binomial CRR,1000,1.999468420992e-03
+Binomial CRR,2000,9.997967276227e-04
+Implicit Euler,10,1.043058754865e-01
+Crank-Nicolson (no start-up),10,1.952882351638e-01
+Crank-Nicolson + Rannacher,10,8.089819682702e-03
+Implicit Euler,20,5.233600863510e-02
+Crank-Nicolson (no start-up),20,9.627726910159e-02
+Crank-Nicolson + Rannacher,20,2.037593754917e-03
+Implicit Euler,40,2.622414432480e-02
+Crank-Nicolson (no start-up),40,4.431391022245e-02
+Crank-Nicolson + Rannacher,40,5.332251256061e-04
+Implicit Euler,80,1.313804988913e-02
+Crank-Nicolson (no start-up),80,1.572076850032e-02
+Crank-Nicolson + Rannacher,80,1.576185335015e-04
+Finite difference (space),100,1.303988640306e-02
+P1 finite elements,100,4.708099089875e-03
+Finite difference (space),200,3.249225476768e-03
+P1 finite elements,200,1.177449686157e-03
+Finite difference (space),400,8.116393746391e-04
+P1 finite elements,400,2.943889073066e-04
+Monte Carlo std. error,2000,3.334801307086e-01
+Monte Carlo std. error,8000,1.635162338778e-01
+Monte Carlo std. error,32000,8.268756400167e-02
+Monte Carlo std. error,128000,4.107061226169e-02
