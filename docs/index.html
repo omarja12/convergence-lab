@@ -673,7 +673,7 @@ cfg.rannacher_steps = 0;   // 2 by default</code></pre>
     }
     var denom = n * sxx - sx * sx;
     if (Math.abs(denom) < 1e-12) return null;
-    return (n * sxy - sx * sy) / denom;
+    return Math.abs((n * sxy - sx * sy) / denom);
   }
 
   function fmtExp(x) {
@@ -1014,8 +1014,8 @@ cfg.rannacher_steps = 0;   // 2 by default</code></pre>
                       '<ul class="legend" id="' + fac.id + '-legend"></ul>';
       frag.appendChild(div);
 
-      var vizEl = document.getElementById(fac.id + "-viz");
-      var legendEl = document.getElementById(fac.id + "-legend");
+      var vizEl = div.querySelector("#" + fac.id + "-viz");
+      var legendEl = div.querySelector("#" + fac.id + "-legend");
       if (vizEl && legendEl) {
         buildFacetChart(vizEl, fac.id + "-title", fac.series, xMin, xMax, yMin, yMax, fac.guides);
         legendEl.innerHTML = legendHTML(fac.series);
