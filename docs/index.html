@@ -4,60 +4,68 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>convergence-lab — Omar Jarir</title>
-<meta name="description" content="Do numerical schemes converge at the rate theory promises? Black-Scholes by lattice, finite difference, finite element and Monte Carlo in C++20, with every order measured.">
+<meta name="description" content="The Black-Scholes PDE solved four ways in C++20 — lattices, finite difference, finite element and Monte Carlo — with every convergence rate measured, including the Crank-Nicolson order loss that Rannacher start-up fixes.">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <style>
-/* Shared shell — loaded by the hub and every project site.
-   Published at https://omarja12.github.io/assets/site.css
-   Load this FIRST; a project's own stylesheet overrides anything it redefines. */
-
+/* ===== shared shell ===== */
 :root {
-  --bg:        #fbfaf8;
-  --surface:   #ffffff;
-  --border:    #e3ded6;
-  --border-mid:#cfc8bd;
-  --ink:       #1a1815;
-  --ink-mid:   #55504a;
-  --ink-soft:  #6e675e;
-  --accent:    #8a5a2b;
-  --accent-bg: #f3ece2;
+  --bg: #f7f4ef;
+  --surface: #ffffff;
+  --surface-2: #faf8f4;
+  --border: #e3ded5;
+  --border-mid: #cfc8bb;
+  --ink: #1c1a17;
+  --ink-mid: #5a544c;
+  --ink-soft: #8a8378;
+  --accent: #b5763a;
+  --accent-soft: #d4a574;
+  --accent-bg: #f5ede4;
+  --good: #4a7c4e;
+  --bad: #b4462f;
 
-  --sans: ui-sans-serif, -apple-system, "Segoe UI", Inter, system-ui, sans-serif;
+  --sans: ui-sans-serif, -apple-system, "Segoe UI", Roboto, system-ui, sans-serif;
+  --serif: ui-serif, Georgia, "Times New Roman", serif;
   --mono: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
 
   --measure: 68ch;
-  --gutter: 16px;
+  --gutter: 22px;
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg:        #14130f;
-    --surface:   #1c1a16;
-    --border:    #2e2a24;
-    --border-mid:#433d34;
-    --ink:       #f0ece4;
-    --ink-mid:   #b3aca1;
-    --ink-soft:  #9a9287;
-    --accent:    #d9a066;
+    --bg: #14130f;
+    --surface: #1c1a16;
+    --surface-2: #221f1a;
+    --border: #2e2a24;
+    --border-mid: #433d34;
+    --ink: #f0ece4;
+    --ink-mid: #b3aca1;
+    --ink-soft: #9a9287;
+    --accent: #d9a066;
+    --accent-soft: #c48a4a;
     --accent-bg: #26211a;
+    --good: #6aad6e;
+    --bad: #e07a5e;
   }
 }
-
 :root[data-theme="dark"] {
-  --bg:        #14130f;
-  --surface:   #1c1a16;
-  --border:    #2e2a24;
-  --border-mid:#433d34;
-  --ink:       #f0ece4;
-  --ink-mid:   #b3aca1;
-  --ink-soft:  #9a9287;
-  --accent:    #d9a066;
+  --bg: #14130f;
+  --surface: #1c1a16;
+  --surface-2: #221f1a;
+  --border: #2e2a24;
+  --border-mid: #433d34;
+  --ink: #f0ece4;
+  --ink-mid: #b3aca1;
+  --ink-soft: #9a9287;
+  --accent: #d9a066;
+  --accent-soft: #c48a4a;
   --accent-bg: #26211a;
+  --good: #6aad6e;
+  --bad: #e07a5e;
 }
 
 * { box-sizing: border-box; }
-
-html { -webkit-text-size-adjust: 100%; }
+html { -webkit-text-size-adjust: 100%; scroll-behavior: smooth; }
 
 body {
   margin: 0;
@@ -65,411 +73,399 @@ body {
   color: var(--ink);
   font-family: var(--sans);
   font-size: 16px;
-  line-height: 1.6;
+  line-height: 1.65;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 .wrap {
-  max-width: 1040px;
+  max-width: 1080px;
   margin: 0 auto;
   padding: 0 var(--gutter);
 }
 
-/* ---------- header ---------- */
-
+/* ===== header ===== */
 .site-head {
-  padding: 56px 0 8px;
+  padding: 68px 0 14px;
 }
-
-/* brand lockup */
 .brand {
   display: inline-flex;
   align-items: center;
-  gap: 11px;
-  margin: 0 0 26px;
+  gap: 10px;
+  margin: 0 0 32px;
   color: var(--accent);
   text-decoration: none;
+  transition: color .15s ease;
 }
-
-.brand svg { display: block; width: 34px; height: 27px; }
+.brand:hover { color: var(--accent-soft); }
+.brand svg { display: block; width: 36px; height: 29px; }
 
 .brand-word {
   font-family: var(--mono);
-  font-size: 0.76rem;
+  font-size: 0.72rem;
   font-weight: 600;
-  letter-spacing: 0.15em;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--ink-soft);
+  transition: color .15s ease;
 }
-
-a.brand:hover .brand-word { color: var(--accent); }
+.brand:hover .brand-word { color: var(--accent); }
 
 .site-name {
-  font-size: clamp(1.75rem, 5vw, 2.5rem);
-  font-weight: 620;
-  letter-spacing: -0.022em;
+  font-size: clamp(2rem, 5.5vw, 2.85rem);
+  font-weight: 630;
+  letter-spacing: -0.026em;
   margin: 0;
-  line-height: 1.15;
+  line-height: 1.1;
+  font-family: var(--serif);
 }
 
 .site-tagline {
-  margin: 14px 0 0;
-  font-size: clamp(1rem, 2.4vw, 1.15rem);
+  margin: 16px 0 0;
+  font-size: clamp(1rem, 2.2vw, 1.14rem);
   color: var(--ink-mid);
   max-width: var(--measure);
+  line-height: 1.55;
 }
 
-.site-head hr {
-  margin: 40px 0 0;
-  border: 0;
-  border-top: 1px solid var(--border);
-}
-
-/* ---------- band ---------- */
-
-.band { margin: 56px 0 0; }
-
-.band-label {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  margin: 0 0 22px;
-  font-family: var(--mono);
-  font-size: 0.72rem;
-  font-weight: 600;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--ink-soft);
-}
-
-.band-label::after {
-  content: "";
-  flex: 1;
-  height: 1px;
-  background: var(--border);
-}
-
-/* ---------- grid ---------- */
-
-.grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 18px;
-}
-
-@media (max-width: 860px) { .grid { grid-template-columns: repeat(2, 1fr); } }
-@media (max-width: 580px) { .grid { grid-template-columns: 1fr; } }
-
-/* The lead project in a band runs two columns wide, so a band of two cards
-   still fills its row. Below 861px the grid is too narrow for it to help. */
-.card--feature { grid-column: span 2; }
-
-@media (max-width: 860px) { .card--feature { grid-column: span 1; } }
-
-.card {
-  display: flex;
-  flex-direction: column;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 22px 20px 18px;
-  transition: border-color .15s ease;
-}
-
-.card:hover {
-  border-color: var(--border-mid);
-}
-
-.card-title {
-  margin: 0;
-  font-size: 1.04rem;
-  font-weight: 620;
-  letter-spacing: -0.012em;
-}
-
-.card-desc {
-  margin: 10px 0 0;
-  font-size: 0.925rem;
-  color: var(--ink-mid);
-  flex: 1;
-}
-
-.card-meta {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-  margin: 18px 0 0;
-  font-family: var(--mono);
-  font-size: 0.72rem;
-  color: var(--ink-soft);
-}
-
-.tag {
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  padding: 2px 7px;
-}
-
-.year {
-  margin-left: auto;
-  color: var(--accent);
-  background: var(--accent-bg);
-  border-radius: 4px;
-  padding: 2px 7px;
-  font-weight: 600;
-}
-
-.card-links {
-  display: flex;
-  gap: 18px;
-  margin: 16px 0 0;
-  padding: 14px 0 0;
-  border-top: 1px solid var(--border);
-  font-size: 0.85rem;
-}
-
-.card-links a {
-  color: var(--accent);
-  text-decoration: none;
-  font-weight: 550;
-}
-
-.card-links a:hover { text-decoration: underline; }
-
-.card-links .muted {
-  color: var(--ink-soft);
-  font-weight: 400;
-  cursor: default;
-}
-
-/* ---------- footer ---------- */
-
-.site-foot {
-  margin: 88px 0 0;
-  padding: 28px 0 56px;
-  border-top: 1px solid var(--border);
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px 26px;
-  align-items: center;
-  font-size: 0.9rem;
-  color: var(--ink-soft);
-}
-
-.site-foot a {
-  color: var(--ink-mid);
-  text-decoration: none;
-}
-
-.site-foot a:hover { color: var(--accent); }
-
-/* ---------- article, for project sites ---------- */
-
-.article { max-width: var(--measure); margin: 0 0 8px; }
+/* ===== article ===== */
+.article { max-width: var(--measure); }
 
 .article h2 {
-  margin: 56px 0 0;
-  font-size: 1.35rem;
-  font-weight: 620;
-  letter-spacing: -0.016em;
+  margin: 60px 0 0;
+  font-size: 1.5rem;
+  font-weight: 630;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+  font-family: var(--serif);
 }
 
 .article h3 {
-  margin: 34px 0 0;
-  font-size: 1.05rem;
+  margin: 38px 0 0;
+  font-size: 1.08rem;
   font-weight: 620;
 }
 
-.article p { margin: 14px 0 0; }
+.article p { margin: 16px 0 0; }
 
-.article ul, .article ol { margin: 14px 0 0; padding-left: 22px; }
-.article li { margin: 7px 0 0; }
+.article ul, .article ol { margin: 16px 0 0; padding-left: 24px; }
+.article li { margin: 8px 0 0; }
 
 .article strong { font-weight: 640; }
 
-.article a { color: var(--accent); text-decoration: none; }
+.article a {
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: 530;
+}
 .article a:hover { text-decoration: underline; }
 
-.lede {
-  font-size: 1.1rem;
-  color: var(--ink-mid);
-}
-
-/* pull-out for a key result */
-.result {
-  margin: 30px 0 0;
-  padding: 20px 22px;
-  background: var(--accent-bg);
-  border-left: 3px solid var(--accent);
-  border-radius: 0 8px 8px 0;
-}
-
-.result p { margin: 0; }
-.result p + p { margin-top: 10px; }
-
-/* code */
-pre {
-  margin: 20px 0 0;
-  padding: 16px 18px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  overflow-x: auto;
+.article code {
   font-family: var(--mono);
-  font-size: 0.82rem;
-  line-height: 1.55;
-  color: var(--ink-mid);
-}
-
-code {
-  font-family: var(--mono);
-  font-size: 0.88em;
-  background: var(--surface);
+  font-size: 0.86em;
+  background: var(--surface-2);
   border: 1px solid var(--border);
   border-radius: 4px;
   padding: 1px 5px;
+  color: var(--ink);
 }
 
-pre code { background: none; border: 0; padding: 0; font-size: inherit; }
-
-/* stage list */
-.stages {
-  margin: 24px 0 0;
-  padding: 0;
-  list-style: none;
-  counter-reset: stage;
-}
-
-.stages li {
-  position: relative;
-  margin: 0;
-  padding: 14px 0 14px 46px;
-  border-top: 1px solid var(--border);
-  counter-increment: stage;
-}
-
-.stages li:last-child { border-bottom: 1px solid var(--border); }
-
-.stages li::before {
-  content: counter(stage);
-  position: absolute;
-  left: 0;
-  top: 13px;
-  width: 26px;
-  height: 26px;
-  display: grid;
-  place-items: center;
-  border-radius: 50%;
-  background: var(--accent-bg);
-  color: var(--accent);
+pre {
+  margin: 22px 0 0;
+  padding: 18px 20px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow-x: auto;
   font-family: var(--mono);
-  font-size: 0.75rem;
-  font-weight: 700;
+  font-size: 0.84rem;
+  line-height: 1.6;
+  color: var(--ink-mid);
+}
+pre code {
+  background: none;
+  border: 0;
+  padding: 0;
+  font-size: inherit;
+  color: inherit;
 }
 
-.stages b { display: block; font-weight: 620; }
-.stages span { color: var(--ink-mid); font-size: 0.93rem; }
+/* ===== lede ===== */
+.lede {
+  font-size: 1.12rem;
+  color: var(--ink-mid);
+  line-height: 1.6;
+}
 
-/* ---------- back link, for project sites ---------- */
+/* ===== result callout ===== */
+.result {
+  margin: 36px 0 0;
+  padding: 24px 28px;
+  background: var(--accent-bg);
+  border-left: 3px solid var(--accent);
+  border-radius: 0 10px 10px 0;
+}
+.result p { margin: 0; font-size: 1.02rem; }
+.result p + p { margin-top: 11px; color: var(--ink-mid); }
+.result strong { font-weight: 650; }
 
+/* ===== implementation cards ===== */
+.impl-list {
+  list-style: none;
+  margin: 20px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 14px;
+}
+.impl-list li {
+  padding: 18px 22px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.impl-list li strong {
+  display: block;
+  font-size: 1rem;
+  font-weight: 630;
+  margin-bottom: 4px;
+  color: var(--ink);
+}
+.impl-list li p {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--ink-mid);
+  line-height: 1.55;
+}
+
+/* ===== back link ===== */
 .back-link {
-  display: inline-block;
-  margin: 28px 0 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 36px 0 0;
   font-family: var(--mono);
   font-size: 0.78rem;
   color: var(--ink-soft);
   text-decoration: none;
 }
-
 .back-link:hover { color: var(--accent); }
+.back-link svg { width: 13px; height: 13px; }
 
-@media (prefers-reduced-motion: reduce) {
-  .card { transition: none; }
+/* ===== footer ===== */
+.site-foot {
+  margin: 56px 0 0;
+  padding: 26px 0 52px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 28px;
+  align-items: center;
+  font-size: 0.9rem;
+  color: var(--ink-soft);
 }
+.site-foot span { color: var(--ink-mid); }
+.site-foot a {
+  color: var(--ink-mid);
+  text-decoration: none;
+}
+.site-foot a:hover { color: var(--accent); }
 
-/* ---------- chart ---------- */
+/* ===== chart ===== */
 .viz {
-  /* Break out of the article's reading measure: the article is left-aligned in
-     a 1040px wrap, so extending right to the wrap edge needs no offset. */
-  width: min(1008px, calc(100vw - 2 * var(--gutter)));
-  max-width: none;
+  width: 100%;
+  max-width: 1008px;
+  margin: 34px 0 0;
   --series-1: #2a78d6;
-  --series-2: #eb6834;
+  --series-2: #c4521e;
   --series-3: #1baf7a;
-  margin: 30px 0 0;
+  --series-4: #8a6a9e;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) .viz {
     --series-1: #3987e5;
     --series-2: #d95926;
     --series-3: #199e70;
+    --series-4: #a088b8;
   }
 }
 :root[data-theme="dark"] .viz {
   --series-1: #3987e5;
   --series-2: #d95926;
   --series-3: #199e70;
+  --series-4: #a088b8;
 }
 
-.viz svg { width: 100%; height: auto; display: block; overflow: visible; }
-.viz .grid { stroke: var(--border); stroke-width: 1; }
-.viz .tick { fill: var(--ink-soft); font-family: var(--mono); font-size: 10px;
-              font-variant-numeric: tabular-nums; }
-.viz .exp { font-size: 7px; }
-.viz .guide { stroke: var(--border-mid); stroke-width: 1; }
+.viz svg { width: 100%; height: auto; display: block; }
+
+.viz .grid     { stroke: var(--border); stroke-width: 1; }
+.viz .tick     { fill: var(--ink-soft); font-family: var(--mono); font-size: 10px;
+                 font-variant-numeric: tabular-nums; }
+.viz .exp      { font-size: 7px; }
+.viz .guide    { stroke: var(--border-mid); stroke-width: 1; stroke-dasharray: 4 3; }
 .viz .guide-label { fill: var(--ink-soft); font-family: var(--mono); font-size: 9.5px; }
-.viz .line { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
-.viz .dot { stroke: var(--surface); stroke-width: 2; }
+.viz .line     { fill: none; stroke-width: 2.2; stroke-linejoin: round; stroke-linecap: round; }
+.viz .dot      { stroke: var(--surface); stroke-width: 2; }
 .viz .dot:hover { r: 6; }
 
-.legend { list-style: none; margin: 14px 0 0; padding: 0; display: flex;
-           flex-wrap: wrap; gap: 6px 22px; font-size: 0.85rem; }
-.legend li { display: flex; align-items: center; gap: 8px; }
-.legend .swatch { width: 11px; height: 11px; border-radius: 3px; flex: none; }
-.legend .nm { color: var(--ink-mid); }
-.legend .ord { font-family: var(--mono); font-size: 0.76rem; color: var(--ink-soft);
-                font-variant-numeric: tabular-nums; }
+.legend {
+  list-style: none;
+  margin: 16px 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px 24px;
+  font-size: 0.86rem;
+}
+.legend li { display: flex; align-items: center; gap: 9px; }
+.legend .swatch { width: 12px; height: 12px; border-radius: 3px; flex: none; }
+.legend .nm { color: var(--ink); font-weight: 530; }
+.legend .ord {
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  color: var(--ink-soft);
+  font-variant-numeric: tabular-nums;
+}
 
-.facets { display: grid; grid-template-columns: repeat(3, 1fr); gap: 30px; margin: 30px 0 0;
-            width: min(1008px, calc(100vw - 2 * var(--gutter))); }
-.facets .viz, .facet.viz { width: 100%; }
-@media (max-width: 760px) { .facets { grid-template-columns: 1fr; } }
-.facet h3 { margin: 0 0 4px; font-size: 0.95rem; font-weight: 620; }
-.facet p { margin: 2px 0 0; font-size: 0.85rem; color: var(--ink-soft); }
-.facet .legend { margin-top: 10px; flex-direction: column; gap: 5px; }
+.facets {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 32px;
+  margin: 36px 0 0;
+  width: 100%;
+  max-width: 1008px;
+}
+.facet { display: flex; flex-direction: column; }
+.facet .viz { width: 100%; }
+.facet h3 {
+  margin: 0 0 6px;
+  font-size: 1rem;
+  font-weight: 620;
+  color: var(--ink);
+}
+.facet p {
+  margin: 2px 0 0;
+  font-size: 0.84rem;
+  color: var(--ink-soft);
+  font-family: var(--mono);
+}
+.facet .legend {
+  margin-top: 14px;
+  flex-direction: column;
+  gap: 6px;
+}
 .facet .legend li { flex-wrap: wrap; }
 
-.axis-note { margin: 10px 0 0; font-size: 0.8rem; color: var(--ink-soft);
-              font-family: var(--mono); }
-
-details.data { margin: 30px 0 0; border-top: 1px solid var(--border); padding-top: 14px; }
-details.data summary { cursor: pointer; font-size: 0.88rem; color: var(--ink-mid); }
-details.data table { width: 100%; border-collapse: collapse; margin: 16px 0 0;
-                      font-size: 0.82rem; }
-details.data th, details.data td { text-align: left; padding: 5px 10px 5px 0;
-                                    border-bottom: 1px solid var(--border); }
-details.data thead th { font-family: var(--mono); font-size: 0.72rem;
-                         text-transform: uppercase; letter-spacing: .08em;
-                         color: var(--ink-soft); font-weight: 600; }
-details.data tbody th { font-weight: 550; vertical-align: top; padding-top: 8px; }
-details.data .num { font-family: var(--mono); font-variant-numeric: tabular-nums;
-                     color: var(--ink-mid); }
-details.data .ord-cell { vertical-align: top; padding-top: 8px; color: var(--accent);
-                          font-weight: 600; }
-
-table.orders { width: 100%; border-collapse: collapse; margin: 24px 0 0; font-size: 0.9rem; }
-table.orders th, table.orders td { text-align: left; padding: 8px 12px 8px 0;
-                                    border-bottom: 1px solid var(--border); }
-table.orders thead th { font-family: var(--mono); font-size: 0.72rem; text-transform: uppercase;
-                         letter-spacing: .08em; color: var(--ink-soft); font-weight: 600; }
-table.orders .num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
-table.orders .bad { color: #b4462f; font-weight: 600; }
-table.orders .good { color: var(--accent); font-weight: 600; }
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) table.orders .bad { color: #e8836a; }
+.axis-note {
+  margin: 12px 0 0;
+  font-size: 0.8rem;
+  color: var(--ink-soft);
+  font-family: var(--mono);
 }
-:root[data-theme="dark"] table.orders .bad { color: #e8836a; }
+
+/* ===== orders table ===== */
+.table-wrap { margin: 50px 0 0; overflow-x: auto; }
+
+table.orders {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.94rem;
+  min-width: 440px;
+}
+table.orders th, table.orders td {
+  text-align: left;
+  padding: 10px 14px 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+table.orders thead th {
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--ink-soft);
+  font-weight: 600;
+  padding-top: 14px;
+}
+table.orders .num {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-mid);
+}
+table.orders .bad { color: var(--bad); font-weight: 600; }
+table.orders .good { color: var(--good); font-weight: 600; }
+table.orders th[scope="row"] {
+  font-weight: 560;
+  padding-top: 12px;
+}
+table.orders tbody tr:hover td { background: var(--surface-2); }
+
+/* ===== detail data table ===== */
+details.data {
+  margin: 38px 0 0;
+  border-top: 1px solid var(--border);
+  padding-top: 16px;
+}
+details.data summary {
+  cursor: pointer;
+  font-size: 0.88rem;
+  color: var(--ink-mid);
+  font-family: var(--mono);
+  letter-spacing: 0.02em;
+  outline: none;
+  padding: 4px 0;
+}
+details.data summary:hover { color: var(--accent); }
+details.data table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 16px 0 0;
+  font-size: 0.84rem;
+  min-width: 480px;
+}
+details.data th, details.data td {
+  text-align: left;
+  padding: 6px 12px 6px 0;
+  border-bottom: 1px solid var(--border);
+}
+details.data thead th {
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--ink-soft);
+  font-weight: 600;
+  padding-top: 12px;
+}
+details.data .num {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-mid);
+}
+details.data .ord-cell {
+  color: var(--accent);
+  font-weight: 600;
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 0.8rem;
+}
+
+/* ===== responsive ===== */
+@media (max-width: 880px) {
+  .facets { grid-template-columns: 1fr; }
+}
+
+/* ===== reduced motion ===== */
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; }
+}
+
+/* ===== loading state ===== */
+.loading-state {
+  text-align: center;
+  padding: 48px 24px;
+  color: var(--ink-soft);
+  font-family: var(--mono);
+  font-size: 0.85rem;
+}
 </style>
 </head>
 <body>
@@ -488,167 +484,676 @@ table.orders .good { color: var(--accent); font-weight: 600; }
       <span class="brand-word">Omar Jarir</span>
     </a>
     <h1 class="site-name">convergence-lab</h1>
-    <p class="site-tagline">The Black–Scholes PDE solved four ways in C++20 — and the
-    question of whether each scheme converges at the rate its theory promises.</p>
-    <hr>
+    <p class="site-tagline">The Black-Scholes PDE solved four ways in C++20 — lattices, finite difference, finite element and Monte Carlo — with every convergence rate measured, including the Crank-Nicolson order loss that Rannacher start-up fixes.</p>
   </header>
 
-  <main class="article">
+  <main>
+    <article class="article">
 
-    <p class="lede">Any of these methods will land near the analytic price. That is a
-    weak test. What separates a correct implementation from a plausible one is the
-    <em>rate</em>.</p>
+      <p class="lede">Any of these methods will land near the analytic price. That is a weak test. What separates a correct implementation from a plausible one is the <em>rate</em>.</p>
 
-    <p>A scheme with the drift term mis-signed often prices close too, if you only ever
-    run it at one grid size. So nothing here is checked at one grid size. Every method is
-    refined across a range of resolutions, and the observed order is fitted as the slope of
-    <code>log₂(error)</code> against <code>log₂(resolution)</code>. A scheme that happens to
-    be right at one resolution will not hold the right slope across all of them.</p>
+      <p>A scheme with the drift term mis-signed often prices close too, if you only ever run it at one grid size. So nothing here is checked at one grid size. Every method is refined across a range of resolutions, and the observed order is fitted as the slope of <code>log₂(error)</code> against <code>log₂(resolution)</code>. A scheme that happens to be right at one resolution will not hold the right slope across all of them.</p>
 
-    <p>The resolutions plotted here are exactly those the C++ test suite asserts on. Fitting
-    an order is sensitive to which points you fit it on, so sampling a different range for
-    the picture would put a second, disagreeing set of numbers on this page.</p>
+      <p>The resolutions plotted here are exactly those the C++ test suite asserts on. Fitting an order is sensitive to which points you fit it on, so sampling a different range for the picture would put a second, disagreeing set of numbers on this page.</p>
 
-    <h2 id="hero-title">Crank–Nicolson does not deliver its second order</h2>
+      <!-- ===== HERO CHART: the Crank-Nicolson story ===== -->
+      <h2>Crank-Nicolson does not deliver its second order</h2>
 
-    <p>This is the result the repository exists for. Crank–Nicolson is second-order
-    accurate <strong>for smooth data</strong>, and a vanilla payoff is not smooth — it has
-    a kink at the strike. That kink excites high-frequency modes, and Crank–Nicolson's
-    amplification factor tends to −1 as frequency rises, so those modes are never damped.
-    They only alternate sign.</p>
+      <p>This is the result the repository exists for. Crank-Nicolson is second-order accurate <strong>for smooth data</strong>, and a vanilla payoff is not smooth — it has a kink at the strike. That kink excites high-frequency modes, and Crank-Nicolson's amplification factor tends to −1 as frequency rises, so those modes are never damped. They only alternate sign.</p>
 
-    <div class="viz">
-      <svg viewBox="0 0 900 420" role="img" aria-labelledby="hero-title" preserveAspectRatio="xMidYMid meet"><line class="grid" x1="66" y1="361.8" x2="880" y2="361.8"/><text class="tick" x="58" y="365.3" text-anchor="end">10<tspan class="exp" dy="-4">-4</tspan></text><line class="grid" x1="66" y1="268.5" x2="880" y2="268.5"/><text class="tick" x="58" y="272.0" text-anchor="end">10<tspan class="exp" dy="-4">-3</tspan></text><line class="grid" x1="66" y1="175.1" x2="880" y2="175.1"/><text class="tick" x="58" y="178.6" text-anchor="end">10<tspan class="exp" dy="-4">-2</tspan></text><line class="grid" x1="66" y1="81.8" x2="880" y2="81.8"/><text class="tick" x="58" y="85.3" text-anchor="end">10<tspan class="exp" dy="-4">-1</tspan></text><line class="grid" x1="66.0" y1="20" x2="66.0" y2="378"/><text class="tick" x="66.0" y="394" text-anchor="middle">10</text><line class="grid" x1="337.3" y1="20" x2="337.3" y2="378"/><text class="tick" x="337.3" y="394" text-anchor="middle">20</text><line class="grid" x1="608.7" y1="20" x2="608.7" y2="378"/><text class="tick" x="608.7" y="394" text-anchor="middle">40</text><line class="grid" x1="880.0" y1="20" x2="880.0" y2="378"/><text class="tick" x="880.0" y="394" text-anchor="middle">80</text><line class="guide" x1="66.0" y1="19.9" x2="880.0" y2="104.2"/><text class="guide-label" x="513.7" y="59.3" text-anchor="middle">order 1 reference</text><line class="guide" x1="66.0" y1="218.9" x2="880.0" y2="387.4"/><text class="guide-label" x="513.7" y="304.6" text-anchor="middle">order 2 reference</text><path class="line" style="stroke:var(--series-1)" d="M66.0 80.1 L337.3 108.0 L608.7 136.0 L880.0 164.1"/><circle class="dot" style="fill:var(--series-1)" cx="66.0" cy="80.1" r="4"><title>Implicit Euler — resolution 10, error 1.043e-01</title></circle><circle class="dot" style="fill:var(--series-1)" cx="337.3" cy="108.0" r="4"><title>Implicit Euler — resolution 20, error 5.234e-02</title></circle><circle class="dot" style="fill:var(--series-1)" cx="608.7" cy="136.0" r="4"><title>Implicit Euler — resolution 40, error 2.622e-02</title></circle><circle class="dot" style="fill:var(--series-1)" cx="880.0" cy="164.1" r="4"><title>Implicit Euler — resolution 80, error 1.314e-02</title></circle><path class="line" style="stroke:var(--series-2)" d="M66.0 54.6 L337.3 83.3 L608.7 114.8 L880.0 156.8"/><circle class="dot" style="fill:var(--series-2)" cx="66.0" cy="54.6" r="4"><title>Crank-Nicolson (no start-up) — resolution 10, error 1.953e-01</title></circle><circle class="dot" style="fill:var(--series-2)" cx="337.3" cy="83.3" r="4"><title>Crank-Nicolson (no start-up) — resolution 20, error 9.628e-02</title></circle><circle class="dot" style="fill:var(--series-2)" cx="608.7" cy="114.8" r="4"><title>Crank-Nicolson (no start-up) — resolution 40, error 4.431e-02</title></circle><circle class="dot" style="fill:var(--series-2)" cx="880.0" cy="156.8" r="4"><title>Crank-Nicolson (no start-up) — resolution 80, error 1.572e-02</title></circle><path class="line" style="stroke:var(--series-3)" d="M66.0 183.7 L337.3 239.6 L608.7 293.9 L880.0 343.4"/><circle class="dot" style="fill:var(--series-3)" cx="66.0" cy="183.7" r="4"><title>Crank-Nicolson + Rannacher — resolution 10, error 8.090e-03</title></circle><circle class="dot" style="fill:var(--series-3)" cx="337.3" cy="239.6" r="4"><title>Crank-Nicolson + Rannacher — resolution 20, error 2.038e-03</title></circle><circle class="dot" style="fill:var(--series-3)" cx="608.7" cy="293.9" r="4"><title>Crank-Nicolson + Rannacher — resolution 40, error 5.332e-04</title></circle><circle class="dot" style="fill:var(--series-3)" cx="880.0" cy="343.4" r="4"><title>Crank-Nicolson + Rannacher — resolution 80, error 1.576e-04</title></circle></svg>
-      <ul class="legend"><li><span class="swatch" style="background:var(--series-1)"></span><span class="nm">Implicit Euler</span><span class="ord">order 1.00</span></li><li><span class="swatch" style="background:var(--series-2)"></span><span class="nm">Crank-Nicolson (no start-up)</span><span class="ord">order 1.20</span></li><li><span class="swatch" style="background:var(--series-3)"></span><span class="nm">Crank-Nicolson + Rannacher</span><span class="ord">order 1.90</span></li></ul>
+      <div class="viz" id="viz-hero"></div>
+
+      <ul class="legend" id="legend-hero"></ul>
       <p class="axis-note">time steps (log) — error vs the closed form (log)</p>
-    </div>
 
-    <p>The middle line is Crank–Nicolson as textbooks present it. It tracks the
-    <em>first</em>-order guide, alongside implicit Euler, rather than the second-order one —
-    and its error is the worst of the three at every resolution tested.</p>
+      <p>The middle line is Crank-Nicolson as textbooks present it. It tracks the <em>first</em>-order guide, alongside implicit Euler, rather than the second-order one — and its error is the worst of the three at every resolution tested.</p>
 
-    <div class="result">
-      <p><strong>Two fully implicit half-steps at the start recover the missing order.</strong></p>
-      <p>Implicit Euler damps those modes completely, so once they are gone the rest of the
-      run is second order as advertised. At ten time steps that single change takes the
-      error from 1.95 × 10⁻¹ to 8.09 × 10⁻³ — a factor of twenty-four.</p>
-    </div>
+      <div class="result">
+        <p><strong>Two fully implicit half-steps at the start recover the missing order.</strong></p>
+        <p>Implicit Euler damps those modes completely, so once they are gone the rest of the run is second order as advertised. At ten time steps that single change takes the error from 1.95&nbsp;×&nbsp;10⁻¹ to 8.09&nbsp;×&nbsp;10⁻³ — a factor of twenty-four.</p>
+      </div>
 
-    <p>This is Rannacher start-up, and it is not a refinement. It is a correctness fix for
-    a scheme that is otherwise quietly wrong on exactly the payoffs anyone would price with
-    it. Both variants are kept in the test suite, so the <em>failure</em> reproduces, not
-    only the fix:</p>
+      <p>This is Rannacher start-up, and it is not a refinement. It is a correctness fix for a scheme that is otherwise quietly wrong on exactly the payoffs anyone would price with it. Both variants are kept in the test suite, so the <em>failure</em> reproduces, not only the fix:</p>
 
-    <pre><code>FdConfig cfg;
+      <pre><code>FdConfig cfg;
 cfg.scheme = FdScheme::CrankNicolson;
 cfg.rannacher_steps = 0;   // 2 by default</code></pre>
 
-    <h2>Every other scheme, measured the same way</h2>
+      <!-- ===== OTHER SCHEMES ===== -->
+      <h2>Every other scheme, measured the same way</h2>
 
-    <div class="facets">
-      <div class="facet viz">
-        <h3 id="space-title">Space discretisation</h3>
-        <p>refined with Δt ∝ Δx², so the time term cannot mask the spatial order</p>
-        <svg viewBox="0 0 330 230" role="img" aria-labelledby="space-title" preserveAspectRatio="xMidYMid meet"><line class="grid" x1="50" y1="131.8" x2="314" y2="131.8"/><text class="tick" x="42" y="135.3" text-anchor="end">10<tspan class="exp" dy="-4">-3</tspan></text><line class="grid" x1="50" y1="43.6" x2="314" y2="43.6"/><text class="tick" x="42" y="47.1" text-anchor="end">10<tspan class="exp" dy="-4">-2</tspan></text><line class="grid" x1="50.0" y1="16" x2="50.0" y2="196"/><text class="tick" x="50.0" y="212" text-anchor="middle">100</text><line class="grid" x1="182.0" y1="16" x2="182.0" y2="196"/><text class="tick" x="182.0" y="212" text-anchor="middle">200</text><line class="grid" x1="314.0" y1="16" x2="314.0" y2="196"/><text class="tick" x="314.0" y="212" text-anchor="middle">400</text><path class="line" style="stroke:var(--series-1)" d="M50.0 33.4 L182.0 86.6 L314.0 139.7"/><circle class="dot" style="fill:var(--series-1)" cx="50.0" cy="33.4" r="4"><title>Finite difference (space) — resolution 100, error 1.304e-02</title></circle><circle class="dot" style="fill:var(--series-1)" cx="182.0" cy="86.6" r="4"><title>Finite difference (space) — resolution 200, error 3.249e-03</title></circle><circle class="dot" style="fill:var(--series-1)" cx="314.0" cy="139.7" r="4"><title>Finite difference (space) — resolution 400, error 8.116e-04</title></circle><path class="line" style="stroke:var(--series-2)" d="M50.0 72.4 L182.0 125.5 L314.0 178.6"/><circle class="dot" style="fill:var(--series-2)" cx="50.0" cy="72.4" r="4"><title>P1 finite elements — resolution 100, error 4.708e-03</title></circle><circle class="dot" style="fill:var(--series-2)" cx="182.0" cy="125.5" r="4"><title>P1 finite elements — resolution 200, error 1.177e-03</title></circle><circle class="dot" style="fill:var(--series-2)" cx="314.0" cy="178.6" r="4"><title>P1 finite elements — resolution 400, error 2.944e-04</title></circle></svg>
-        <ul class="legend"><li><span class="swatch" style="background:var(--series-1)"></span><span class="nm">Finite difference (space)</span><span class="ord">order 2.00</span></li><li><span class="swatch" style="background:var(--series-2)"></span><span class="nm">P1 finite elements</span><span class="ord">order 2.00</span></li></ul>
+      <div class="facets" id="facets"></div>
+
+      <!-- ===== ORDERS TABLE ===== -->
+      <div class="table-wrap">
+        <table class="orders">
+          <thead>
+            <tr>
+              <th scope="col">Method</th>
+              <th scope="col">Observed</th>
+              <th scope="col">Expected</th>
+              <th scope="col">Status</th>
+            </tr>
+          </thead>
+          <tbody id="orders-body"></tbody>
+        </table>
       </div>
-      <div class="facet viz">
-        <h3 id="lat-title">Lattice</h3>
-        <p>S=K puts the strike on a node, exposing the rate without oscillation</p>
-        <svg viewBox="0 0 330 230" role="img" aria-labelledby="lat-title" preserveAspectRatio="xMidYMid meet"><line class="grid" x1="50" y1="178.6" x2="314" y2="178.6"/><text class="tick" x="42" y="182.1" text-anchor="end">10<tspan class="exp" dy="-4">-3</tspan></text><line class="grid" x1="50" y1="17.8" x2="314" y2="17.8"/><text class="tick" x="42" y="21.3" text-anchor="end">10<tspan class="exp" dy="-4">-2</tspan></text><line class="grid" x1="50.0" y1="16" x2="50.0" y2="196"/><text class="tick" x="50.0" y="212" text-anchor="middle">250</text><line class="grid" x1="138.0" y1="16" x2="138.0" y2="196"/><text class="tick" x="138.0" y="212" text-anchor="middle">500</text><line class="grid" x1="226.0" y1="16" x2="226.0" y2="196"/><text class="tick" x="226.0" y="212" text-anchor="middle">1000</text><line class="grid" x1="314.0" y1="16" x2="314.0" y2="196"/><text class="tick" x="314.0" y="212" text-anchor="middle">2000</text><path class="line" style="stroke:var(--series-1)" d="M50.0 33.4 L138.0 81.8 L226.0 130.2 L314.0 178.6"/><circle class="dot" style="fill:var(--series-1)" cx="50.0" cy="33.4" r="4"><title>Binomial CRR — resolution 250, error 7.995e-03</title></circle><circle class="dot" style="fill:var(--series-1)" cx="138.0" cy="81.8" r="4"><title>Binomial CRR — resolution 500, error 3.998e-03</title></circle><circle class="dot" style="fill:var(--series-1)" cx="226.0" cy="130.2" r="4"><title>Binomial CRR — resolution 1000, error 1.999e-03</title></circle><circle class="dot" style="fill:var(--series-1)" cx="314.0" cy="178.6" r="4"><title>Binomial CRR — resolution 2000, error 9.998e-04</title></circle></svg>
-        <ul class="legend"><li><span class="swatch" style="background:var(--series-1)"></span><span class="nm">Binomial CRR</span><span class="ord">order 1.00</span></li></ul>
-      </div>
-      <div class="facet viz">
-        <h3 id="mc-title">Monte Carlo</h3>
-        <p>standard error, which is the honest measure — a single realised error is a draw</p>
-        <svg viewBox="0 0 330 230" role="img" aria-labelledby="mc-title" preserveAspectRatio="xMidYMid meet"><line class="grid" x1="56" y1="116.9" x2="314" y2="116.9"/><text class="tick" x="48" y="120.4" text-anchor="end">10<tspan class="exp" dy="-4">-1</tspan></text><line class="grid" x1="56.0" y1="16" x2="56.0" y2="196"/><text class="tick" x="56.0" y="212" text-anchor="middle">2000</text><line class="grid" x1="142.0" y1="16" x2="142.0" y2="196"/><text class="tick" x="142.0" y="212" text-anchor="middle">8000</text><line class="grid" x1="228.0" y1="16" x2="228.0" y2="196"/><text class="tick" x="228.0" y="212" text-anchor="middle">32000</text><line class="grid" x1="314.0" y1="16" x2="314.0" y2="196"/><text class="tick" x="314.0" y="212" text-anchor="middle">128000</text><path class="line" style="stroke:var(--series-1)" d="M56.0 33.4 L142.0 82.8 L228.0 130.1 L314.0 178.6"/><circle class="dot" style="fill:var(--series-1)" cx="56.0" cy="33.4" r="4"><title>Monte Carlo std. error — resolution 2000, error 3.335e-01</title></circle><circle class="dot" style="fill:var(--series-1)" cx="142.0" cy="82.8" r="4"><title>Monte Carlo std. error — resolution 8000, error 1.635e-01</title></circle><circle class="dot" style="fill:var(--series-1)" cx="228.0" cy="130.1" r="4"><title>Monte Carlo std. error — resolution 32000, error 8.269e-02</title></circle><circle class="dot" style="fill:var(--series-1)" cx="314.0" cy="178.6" r="4"><title>Monte Carlo std. error — resolution 128000, error 4.107e-02</title></circle></svg>
-        <ul class="legend"><li><span class="swatch" style="background:var(--series-1)"></span><span class="nm">Monte Carlo std. error</span><span class="ord">order 0.50</span></li></ul>
-      </div>
-    </div>
 
-    <table class="orders">
-      <thead><tr><th scope="col">Method</th><th scope="col">Observed</th><th scope="col">Expected</th></tr></thead>
-      <tbody>
-        <tr><th scope="row">Binomial (Cox–Ross–Rubinstein)</th><td class="num">1.000</td><td class="num">1</td></tr>
-        <tr><th scope="row">Implicit Euler, in time</th><td class="num">0.996</td><td class="num">1</td></tr>
-        <tr><th scope="row">Crank–Nicolson <em>without</em> start-up</th><td class="num bad">1.202</td><td class="num">2</td></tr>
-        <tr><th scope="row">Crank–Nicolson <em>with</em> Rannacher</th><td class="num good">1.898</td><td class="num">2</td></tr>
-        <tr><th scope="row">Finite differences, in space</th><td class="num">2.003</td><td class="num">2</td></tr>
-        <tr><th scope="row">P1 finite elements, in mesh size</th><td class="num">2.000</td><td class="num">2</td></tr>
-        <tr><th scope="row">Monte Carlo standard error</th><td class="num">0.502</td><td class="num">0.5</td></tr>
-      </tbody>
-    </table>
+      <!-- ===== DETAIL TABLE ===== -->
+      <details class="data">
+        <summary>Every plotted value, and the fitted order for each series</summary>
+        <div id="detail-table-wrap"></div>
+      </details>
 
-    <details class="data">
-      <summary>Every plotted value, and the fitted order for each series</summary>
-      <table><thead><tr><th scope="col">Method</th><th scope="col">Resolution</th><th scope="col">Error</th><th scope="col">Fitted order</th></tr></thead><tbody><tr><th scope="row" rowspan="4">Binomial CRR</th><td class="num">250</td><td class="num">7.995e-03</td><td class="num ord-cell" rowspan="4">1.000</td></tr><tr><td class="num">500</td><td class="num">3.998e-03</td></tr><tr><td class="num">1000</td><td class="num">1.999e-03</td></tr><tr><td class="num">2000</td><td class="num">9.998e-04</td></tr><tr><th scope="row" rowspan="4">Implicit Euler</th><td class="num">10</td><td class="num">1.043e-01</td><td class="num ord-cell" rowspan="4">0.996</td></tr><tr><td class="num">20</td><td class="num">5.234e-02</td></tr><tr><td class="num">40</td><td class="num">2.622e-02</td></tr><tr><td class="num">80</td><td class="num">1.314e-02</td></tr><tr><th scope="row" rowspan="4">Crank-Nicolson (no start-up)</th><td class="num">10</td><td class="num">1.953e-01</td><td class="num ord-cell" rowspan="4">1.202</td></tr><tr><td class="num">20</td><td class="num">9.628e-02</td></tr><tr><td class="num">40</td><td class="num">4.431e-02</td></tr><tr><td class="num">80</td><td class="num">1.572e-02</td></tr><tr><th scope="row" rowspan="4">Crank-Nicolson + Rannacher</th><td class="num">10</td><td class="num">8.090e-03</td><td class="num ord-cell" rowspan="4">1.898</td></tr><tr><td class="num">20</td><td class="num">2.038e-03</td></tr><tr><td class="num">40</td><td class="num">5.332e-04</td></tr><tr><td class="num">80</td><td class="num">1.576e-04</td></tr><tr><th scope="row" rowspan="3">Finite difference (space)</th><td class="num">100</td><td class="num">1.304e-02</td><td class="num ord-cell" rowspan="3">2.003</td></tr><tr><td class="num">200</td><td class="num">3.249e-03</td></tr><tr><td class="num">400</td><td class="num">8.116e-04</td></tr><tr><th scope="row" rowspan="3">P1 finite elements</th><td class="num">100</td><td class="num">4.708e-03</td><td class="num ord-cell" rowspan="3">2.000</td></tr><tr><td class="num">200</td><td class="num">1.177e-03</td></tr><tr><td class="num">400</td><td class="num">2.944e-04</td></tr><tr><th scope="row" rowspan="4">Monte Carlo std. error</th><td class="num">2000</td><td class="num">3.335e-01</td><td class="num ord-cell" rowspan="4">0.502</td></tr><tr><td class="num">8000</td><td class="num">1.635e-01</td></tr><tr><td class="num">32000</td><td class="num">8.269e-02</td></tr><tr><td class="num">128000</td><td class="num">4.107e-02</td></tr></tbody></table>
-    </details>
+      <!-- ===== WHAT IS IMPLEMENTED ===== -->
+      <h2>What is implemented</h2>
 
-    <h2>What is implemented</h2>
+      <ul class="impl-list">
+        <li>
+          <strong>Lattices.</strong>
+          <p>Binomial in three parameterisations — Cox-Ross-Rubinstein, Jarrow-Rudd, Tian — and the Boyle trinomial. American exercise by taking the payoff maximum at every node. The tree refuses to price when the time step drives the risk-neutral probability outside [0,&nbsp;1], rather than returning an arbitrageable number.</p>
+        </li>
+        <li>
+          <strong>Finite differences.</strong>
+          <p>The whole θ-family: explicit, Crank-Nicolson, implicit, with Rannacher start-up. Tridiagonal solves by the Thomas algorithm. The explicit scheme reports its own stability ratio, which must not exceed ½ — so an unstable configuration announces itself instead of being discovered from a price that has exploded.</p>
+        </li>
+        <li>
+          <strong>Finite elements.</strong>
+          <p>Galerkin with P1 hat functions, both consistent and lumped mass matrices, on the same θ time-stepping. Lumping the mass matrix reproduces the finite-difference scheme to 2&nbsp;×&nbsp;10⁻⁶ — an equivalence the test suite demonstrates rather than mentions.</p>
+        </li>
+        <li>
+          <strong>Monte Carlo.</strong>
+          <p>Exact terminal sampling, Euler-Maruyama and Milstein, with antithetic variates and a control variate on the terminal spot, measured at 7.5× tighter standard error for the same path count. Every result carries a standard error and a 95% interval.</p>
+        </li>
+      </ul>
 
-    <p><strong>Lattices.</strong> Binomial in three parameterisations — Cox–Ross–Rubinstein,
-    Jarrow–Rudd, Tian — and the Boyle trinomial. American exercise by taking the payoff
-    maximum at every node. The tree refuses to price when the time step drives the
-    risk-neutral probability outside [0,1], rather than returning an arbitrageable number.</p>
+      <!-- ===== THREE DECISIONS ===== -->
+      <h2>Three decisions worth the words</h2>
 
-    <p><strong>Finite differences.</strong> The whole θ-family: explicit, Crank–Nicolson,
-    implicit, with Rannacher start-up. Tridiagonal solves by the Thomas algorithm. The
-    explicit scheme reports its own stability ratio, which must not exceed ½ — so an
-    unstable configuration announces itself instead of being discovered from a price that
-    has exploded.</p>
+      <p><strong>Everything is solved in log-spot.</strong> In <code>S</code> the PDE coefficients carry <code>S</code> and <code>S²</code>, so truncation error varies across the grid and the matrix must be rebuilt as the grid changes. Substituting <code>x&nbsp;=&nbsp;ln&nbsp;S</code> makes every coefficient constant: one tridiagonal matrix serves every time step, and the scheme is uniformly accurate.</p>
 
-    <p><strong>Finite elements.</strong> Galerkin with P1 hat functions, both consistent and
-    lumped mass matrices, on the same θ time-stepping. Lumping the mass matrix reproduces
-    the finite-difference scheme to 2 × 10⁻⁶ — an equivalence the test suite demonstrates
-    rather than mentions.</p>
+      <p><strong>Monte Carlo refuses American exercise.</strong> Forward simulation cannot value an optimal stopping problem — that needs Longstaff-Schwartz regression. It throws rather than returning a number that looks like a price.</p>
 
-    <p><strong>Monte Carlo.</strong> Exact terminal sampling, Euler–Maruyama and Milstein,
-    with antithetic variates and a control variate on the terminal spot, measured at 7.5×
-    tighter standard error for the same path count. Every result carries a standard error
-    and a 95% interval.</p>
+      <p><strong>American finite differences use explicit projection</strong>, not a full linear-complementarity solve, so they are first order in time near the free boundary even under Crank-Nicolson. Stated because it is a real limitation, not omitted because it is inconvenient.</p>
 
-    <h2>Three decisions worth the words</h2>
+      <!-- ===== RUNNING IT ===== -->
+      <h2>Running it</h2>
 
-    <p><strong>Everything is solved in log-spot.</strong> In <code>S</code> the PDE
-    coefficients carry <code>S</code> and <code>S²</code>, so truncation error varies across
-    the grid and the matrix must be rebuilt as the grid changes. Substituting
-    <code>x = ln S</code> makes every coefficient constant: one tridiagonal matrix serves
-    every time step, and the scheme is uniformly accurate.</p>
-
-    <p><strong>Monte Carlo refuses American exercise.</strong> Forward simulation cannot
-    value an optimal stopping problem — that needs Longstaff–Schwartz regression. It throws
-    rather than returning a number that looks like a price.</p>
-
-    <p><strong>American finite differences use explicit projection</strong>, not a full
-    linear-complementarity solve, so they are first order in time near the free boundary
-    even under Crank–Nicolson. Stated because it is a real limitation, not omitted because
-    it is inconvenient.</p>
-
-    <h2>Running it</h2>
-
-    <pre><code>cmake -B build -DCMAKE_BUILD_TYPE=Release &amp;&amp; cmake --build build
+      <pre><code>cmake -B build -DCMAKE_BUILD_TYPE=Release &amp;&amp; cmake --build build
 ./build/convergence_tests      # 18 checks
 ./build/convergence_demo       # prices one contract every way, with errors</code></pre>
 
-    <p>Header-only, no dependency beyond a C++20 compiler. Without CMake,
-    <code>build.sh</code> and <code>build.bat</code> do the same job. Every figure and every
-    point on this page is emitted by <code>tools/convergence_study.cpp</code> into
-    <a href="convergence.csv">convergence.csv</a> and plotted from that file, so nothing
-    shown here is a number typed in by hand.</p>
+      <p>Header-only, no dependency beyond a C++20 compiler. Without CMake, <code>build.sh</code> and <code>build.bat</code> do the same job. Every figure and every point on this page is emitted by <code>tools/convergence_study.cpp</code> into <a href="convergence.csv">convergence.csv</a> and plotted from that file, so nothing shown here is a number typed in by hand.</p>
 
-    <p><a href="https://github.com/omarja12/convergence-lab">Source on GitHub →</a></p>
+      <p><a href="https://github.com/omarja12/convergence-lab">Source on GitHub →</a></p>
 
-    <a class="back-link" href="https://omarja12.github.io/">← All work</a>
+      <a class="back-link" href="https://omarja12.github.io/">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M11 3L5 8l6 5"/></svg>
+        ← All work
+      </a>
+
+    </article>
+
+    <footer class="site-foot">
+      <span>Omar Jarir</span>
+      <a href="mailto:jarir.omar@hotmail.fr">jarir.omar@hotmail.fr</a>
+      <a href="https://github.com/omarja12">GitHub</a>
+    </footer>
 
   </main>
 
-  <footer class="site-foot">
-    <span>Omar Jarir</span>
-    <a href="mailto:jarir.omar@hotmail.fr">jarir.omar@hotmail.fr</a>
-    <a href="https://github.com/omarja12">GitHub</a>
-  </footer>
-
 </div>
+
+<script>
+/* =================================================================
+   convergence-lab — charts rendered from convergence.csv
+   Nothing on this page is a number typed in by hand.
+   ================================================================= */
+
+(function () {
+  "use strict";
+
+  /* ---- data ---- */
+  var csvPath = "convergence.csv";
+  var loaded = false;
+  var seriesMap = {};
+
+  var seriesColor = {
+    "Binomial CRR": "#2a78d6",
+    "Implicit Euler": "#2a78d6",
+    "Crank-Nicolson (no start-up)": "#c4521e",
+    "Crank-Nicolson + Rannacher": "#1baf7a",
+    "Finite difference (space)": "#2a78d6",
+    "P1 finite elements": "#c4521e",
+    "Monte Carlo std. error": "#8a6a9e"
+  };
+
+  var expected = {
+    "Binomial CRR": 1,
+    "Implicit Euler": 1,
+    "Crank-Nicolson (no start-up)": 2,
+    "Crank-Nicolson + Rannacher": 2,
+    "Finite difference (space)": 2,
+    "P1 finite elements": 2,
+    "Monte Carlo std. error": 0.5
+  };
+
+  var shortName = {
+    "Binomial CRR": "Binomial CRR",
+    "Implicit Euler": "Implicit Euler",
+    "Crank-Nicolson (no start-up)": "Crank-Nicolson<br>(no start-up)",
+    "Crank-Nicolson + Rannacher": "Crank-Nicolson<br>+ Rannacher",
+    "Finite difference (space)": "Finite difference<br>(space)",
+    "P1 finite elements": "P1 finite<br>elements",
+    "Monte Carlo std. error": "Monte Carlo<br>std. error"
+  };
+
+  var displayOrder = [
+    "Binomial CRR",
+    "Implicit Euler",
+    "Crank-Nicolson (no start-up)",
+    "Crank-Nicolson + Rannacher",
+    "Finite difference (space)",
+    "P1 finite elements",
+    "Monte Carlo std. error"
+  ];
+
+  /* ---- helpers ---- */
+  function log2(x) { return Math.log(x) / Math.LN2; }
+  function log10(x) { return Math.log(x) / Math.LN10; }
+
+  function fittedOrder(pts) {
+    if (!pts || pts.length < 2) return null;
+    var n = pts.length;
+    var sx = 0, sy = 0, sxx = 0, sxy = 0;
+    for (var i = 0; i < n; i++) {
+      var lx = log2(pts[i].resolution);
+      var ly = log2(pts[i].error);
+      sx += lx; sy += ly; sxx += lx * lx; sxy += lx * ly;
+    }
+    var denom = n * sxx - sx * sx;
+    if (Math.abs(denom) < 1e-12) return null;
+    return (n * sxy - sx * sy) / denom;
+  }
+
+  function fmtExp(x) {
+    if (x === 0) return "0";
+    var e = Math.floor(log10(Math.abs(x)));
+    var m = x / Math.pow(10, e);
+    return m.toFixed(3) + "e" + (e >= 0 ? "+" : "") + e;
+  }
+
+  function fmtOrd(v) {
+    if (v === null) return "—";
+    return v.toFixed(3);
+  }
+
+  /* ---- CSV parsing ---- */
+  function parseCSV(text) {
+    var lines = text.replace(/^\uFEFF/, "").split(/\r?\n/);
+    var out = [];
+    for (var i = 1; i < lines.length; i++) {
+      var line = lines[i].trim();
+      if (!line) continue;
+      var p = line.split(",");
+      if (p.length < 3) continue;
+      var series = p[0].trim();
+      var res = parseInt(p[1], 10);
+      var err = parseFloat(p[2].replace(/[,\s]/g, ""));
+      if (isNaN(res) || isNaN(err)) continue;
+      out.push({ series: series, resolution: res, error: err });
+    }
+    return out;
+  }
+
+  function buildSeriesMap(data) {
+    for (var i = 0; i < data.length; i++) {
+      var s = data[i].series;
+      if (!seriesMap[s]) seriesMap[s] = [];
+      seriesMap[s].push(data[i]);
+    }
+  }
+
+  /* ---- SVG chart builder ---- */
+  function buildChart(container, titleId, seriesList, xMin, xMax, yMin, yMax, guides, xLabel) {
+    var W = 900, H = 440;
+    var pad = { l: 54, r: 22, t: 18, b: 42 };
+    var pw = W - pad.l - pad.r;
+    var ph = H - pad.t - pad.b;
+
+    var lxMin = log10(xMin), lxMax = log10(xMax);
+    var lyMin = log10(yMin), lyMax = log10(yMax);
+
+    function xPx(lx) { return pad.l + (lx - lxMin) / (lxMax - lxMin) * pw; }
+    function yPx(ly) { return pad.t + (lyMax - ly) / (lyMax - lyMin) * ph; }
+
+    var parts = [];
+
+    // horizontal grid
+    var yStart = Math.ceil(yMin / 10) * 10;
+    for (var y = yStart; y <= yMax; y *= 10) {
+      if (y < yMin || y > yMax) continue;
+      var ly = log10(y);
+      parts.push('<line class="grid" x1="' + pad.l + '" y1="' + yPx(ly).toFixed(1) +
+                 '" x2="' + (W - pad.r) + '" y2="' + yPx(ly).toFixed(1) + '"/>');
+      parts.push('<text class="tick" x="' + (pad.l - 8) + '" y="' + (yPx(ly) + 3.5).toFixed(1) +
+                 '" text-anchor="end">10<tspan class="exp" dy="-4">' + exponentSuffix(y) + '</tspan></text>');
+    }
+
+    // vertical ticks
+    var xStep = niceStep(xMin, xMax);
+    for (var x = Math.ceil(xMin / xStep) * xStep; x <= xMax; x += xStep) {
+      if (x < xMin || x > xMax) continue;
+      var lx = log10(x);
+      parts.push('<line class="grid" x1="' + xPx(lx).toFixed(1) + '" y1="' + pad.t +
+                 '" x2="' + xPx(lx).toFixed(1) + '" y2="' + (H - pad.b) + '"/>');
+      parts.push('<text class="tick" x="' + xPx(lx).toFixed(1) + '" y="' + (H - pad.b + 18) +
+                 '" text-anchor="middle">' + x + '</text>');
+    }
+
+    // guide lines
+    if (guides) {
+      for (var g = 0; g < guides.length; g++) {
+        var go = guides[g];
+        // pick a line with slope -go in log-log that fits nicely
+        var x0 = lxMin + 0.03;
+        var x1 = lxMax - 0.03;
+        var y0 = lyMax - 0.35;
+        var y1 = y0 - go * (x1 - x0);
+        // shift whole line down so it sits inside plot
+        var shift = (lyMax - y1) * 0.85;
+        var ay0 = y0 + shift;
+        var ay1 = y1 + shift;
+        if (ay0 >= lyMin + 0.05 && ay1 <= lyMax - 0.05) {
+          parts.push('<line class="guide" x1="' + xPx(x0).toFixed(1) + '" y1="' + yPx(ay0).toFixed(1) +
+                     '" x2="' + xPx(x1).toFixed(1) + '" y2="' + yPx(ay1).toFixed(1) + '"/>');
+          var midX = (x0 + x1) / 2;
+          var midY = (ay0 + ay1) / 2;
+          parts.push('<text class="guide-label" x="' + xPx(midX).toFixed(1) + '" y="' + (yPx(midY) - 6).toFixed(1) +
+                     '" text-anchor="middle">order ' + go + ' reference</text>');
+        }
+      }
+    }
+
+    // series
+    for (var s = 0; s < seriesList.length; s++) {
+      var name = seriesList[s];
+      var pts = seriesMap[name] || [];
+      if (pts.length < 2) continue;
+      var sorted = pts.slice().sort(function (a, b) { return a.resolution - b.resolution; });
+      var color = seriesColor[name] || "#888";
+      var d = "";
+      for (var i = 0; i < sorted.length; i++) {
+        var px = xPx(log10(sorted[i].resolution));
+        var py = yPx(log10(sorted[i].error));
+        d += (i === 0 ? "M" : "L") + px.toFixed(1) + " " + py.toFixed(1) + " ";
+      }
+      parts.push('<path class="line" style="stroke:' + color + '" d="' + d + '"/>');
+      for (var i = 0; i < sorted.length; i++) {
+        var px = xPx(log10(sorted[i].resolution));
+        var py = yPx(log10(sorted[i].error));
+        parts.push('<circle class="dot" style="fill:' + color + '" cx="' + px.toFixed(1) +
+                   '" cy="' + py.toFixed(1) + '" r="4">' +
+                   '<title>' + name + ' — resolution ' + sorted[i].resolution + ', error ' + fmtExp(sorted[i].error) + '</title>' +
+                   '</circle>');
+      }
+    }
+
+    var svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-labelledby="' + titleId +
+              '" preserveAspectRatio="xMidYMid meet">' + parts.join("") + '</svg>';
+    container.innerHTML = svg;
+  }
+
+  function exponentSuffix(y) {
+    if (y === 1) return "";
+    var e = Math.round(log10(y));
+    if (e === 0) return "";
+    return e.toString();
+  }
+
+  function niceStep(xMin, xMax) {
+    var range = xMax - xMin;
+    if (range <= 0) return 1;
+    var raw = range / 5;
+    var mag = Math.pow(10, Math.floor(log10(raw)));
+    var norm = raw / mag;
+    var step;
+    if (norm < 1.5) step = 1;
+    else if (norm < 3.5) step = 2;
+    else if (norm < 7.5) step = 5;
+    else step = 10;
+    return step * mag;
+  }
+
+  function legendHTML(seriesList) {
+    var out = [];
+    for (var i = 0; i < seriesList.length; i++) {
+      var name = seriesList[i];
+      var pts = seriesMap[name] || [];
+      var o = fittedOrder(pts);
+      out.push('<li><span class="swatch" style="background:' + (seriesColor[name] || "#888") + '"></span>' +
+               '<span class="nm">' + name.replace(/<br>/g, " ") + '</span>' +
+               '<span class="ord">order ' + fmtOrd(o) + '</span></li>');
+    }
+    return out.join("");
+  }
+
+  /* ---- FACET CHARTS (smaller, for the 3-panel section) ---- */
+  function buildFacetChart(container, titleId, seriesList, xMin, xMax, yMin, yMax, guides) {
+    var W = 340, H = 240;
+    var pad = { l: 44, r: 14, t: 14, b: 34 };
+    var pw = W - pad.l - pad.r;
+    var ph = H - pad.t - pad.b;
+
+    var lxMin = log10(xMin), lxMax = log10(xMax);
+    var lyMin = log10(yMin), lyMax = log10(yMax);
+
+    function xPx(lx) { return pad.l + (lx - lxMin) / (lxMax - lxMin) * pw; }
+    function yPx(ly) { return pad.t + (lyMax - ly) / (lyMax - lyMin) * ph; }
+
+    var parts = [];
+
+    // grid
+    var yStart = Math.ceil(yMin);
+    for (var y = yStart; y <= yMax; y *= 10) {
+      if (y < yMin || y > yMax) continue;
+      var ly = log10(y);
+      parts.push('<line class="grid" x1="' + pad.l + '" y1="' + yPx(ly).toFixed(1) +
+                 '" x2="' + (W - pad.r) + '" y2="' + yPx(ly).toFixed(1) + '"/>');
+      parts.push('<text class="tick" x="' + (pad.l - 6) + '" y="' + (yPx(ly) + 3.5).toFixed(1) +
+                 '" text-anchor="end">10<tspan class="exp" dy="-4">' + exponentSuffix(y) + '</tspan></text>');
+    }
+
+    var xStep = niceStep(xMin, xMax);
+    for (var x = Math.ceil(xMin / xStep) * xStep; x <= xMax; x += xStep) {
+      if (x < xMin || x > xMax) continue;
+      var lx = log10(x);
+      parts.push('<line class="grid" x1="' + xPx(lx).toFixed(1) + '" y1="' + pad.t +
+                 '" x2="' + xPx(lx).toFixed(1) + '" y2="' + (H - pad.b) + '"/>');
+      parts.push('<text class="tick" x="' + xPx(lx).toFixed(1) + '" y="' + (H - pad.b + 16) +
+                 '" text-anchor="middle">' + x + '</text>');
+    }
+
+    // guides
+    if (guides) {
+      for (var g = 0; g < guides.length; g++) {
+        var go = guides[g];
+        var x0 = lxMin + 0.04;
+        var x1 = lxMax - 0.04;
+        var y0 = lyMax - 0.3;
+        var y1 = y0 - go * (x1 - x0);
+        var shift = (lyMax - y1) * 0.82;
+        var ay0 = y0 + shift;
+        var ay1 = y1 + shift;
+        if (ay0 >= lyMin + 0.04 && ay1 <= lyMax - 0.04) {
+          parts.push('<line class="guide" x1="' + xPx(x0).toFixed(1) + '" y1="' + yPx(ay0).toFixed(1) +
+                     '" x2="' + xPx(x1).toFixed(1) + '" y2="' + yPx(ay1).toFixed(1) + '"/>');
+          parts.push('<text class="guide-label" x="' + xPx((x0+x1)/2).toFixed(1) + '" y="' +
+                     (yPx((ay0+ay1)/2) - 5).toFixed(1) + '" text-anchor="middle">order ' + go + '</text>');
+        }
+      }
+    }
+
+    // series
+    for (var s = 0; s < seriesList.length; s++) {
+      var name = seriesList[s];
+      var pts = seriesMap[name] || [];
+      if (pts.length < 2) continue;
+      var sorted = pts.slice().sort(function (a, b) { return a.resolution - b.resolution; });
+      var color = seriesColor[name] || "#888";
+      var d = "";
+      for (var i = 0; i < sorted.length; i++) {
+        var px = xPx(log10(sorted[i].resolution));
+        var py = yPx(log10(sorted[i].error));
+        d += (i === 0 ? "M" : "L") + px.toFixed(1) + " " + py.toFixed(1) + " ";
+      }
+      parts.push('<path class="line" style="stroke:' + color + '" d="' + d + '"/>');
+      for (var i = 0; i < sorted.length; i++) {
+        var px = xPx(log10(sorted[i].resolution));
+        var py = yPx(log10(sorted[i].error));
+        parts.push('<circle class="dot" style="fill:' + color + '" cx="' + px.toFixed(1) +
+                   '" cy="' + py.toFixed(1) + '" r="3.5">' +
+                   '<title>' + name + ' — resolution ' + sorted[i].resolution + ', error ' + fmtExp(sorted[i].error) + '</title>' +
+                   '</circle>');
+      }
+    }
+
+    var svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-labelledby="' + titleId +
+              '" preserveAspectRatio="xMidYMid meet">' + parts.join("") + '</svg>';
+    container.innerHTML = svg;
+  }
+
+  /* ---- render hero chart ---- */
+  function renderHero() {
+    var seriesList = [
+      "Implicit Euler",
+      "Crank-Nicolson (no start-up)",
+      "Crank-Nicolson + Rannacher"
+    ];
+
+    var pts = [];
+    for (var i = 0; i < seriesList.length; i++) {
+      var sp = seriesMap[seriesList[i]] || [];
+      for (var j = 0; j < sp.length; j++) pts.push(sp[j]);
+    }
+    var xMin = Infinity, xMax = -Infinity, yMin = Infinity, yMax = -Infinity;
+    for (var i = 0; i < pts.length; i++) {
+      if (pts[i].resolution < xMin) xMin = pts[i].resolution;
+      if (pts[i].resolution > xMax) xMax = pts[i].resolution;
+      if (pts[i].error < yMin) yMin = pts[i].error;
+      if (pts[i].error > yMax) yMax = pts[i].error;
+    }
+
+    // pad
+    xMin = xMin * 0.8;
+    xMax = xMax * 1.2;
+    yMin = Math.min(yMin * 0.7, 1e-5);
+    yMax = yMax * 1.6;
+
+    var container = document.getElementById("viz-hero");
+    if (!container) return;
+    buildChart(container, "hero-title", seriesList, xMin, xMax, yMin, yMax, [1, 2]);
+    document.getElementById("legend-hero").innerHTML = legendHTML(seriesList);
+  }
+
+  /* ---- render facets ---- */
+  function renderFacets() {
+    var facets = [
+      {
+        id: "space",
+        title: "Space discretisation",
+        note: "refined with Δt ∝ Δx², so the time term cannot mask the spatial order",
+        series: ["Finite difference (space)", "P1 finite elements"],
+        guides: [2]
+      },
+      {
+        id: "lattice",
+        title: "Lattice",
+        note: "S=K puts the strike on a node, exposing the rate without oscillation",
+        series: ["Binomial CRR"],
+        guides: [1]
+      },
+      {
+        id: "mc",
+        title: "Monte Carlo",
+        note: "standard error, which is the honest measure — a single realised error is a draw",
+        series: ["Monte Carlo std. error"],
+        guides: [0.5]
+      }
+    ];
+
+    var frag = document.createDocumentFragment();
+
+    for (var f = 0; f < facets.length; f++) {
+      var fac = facets[f];
+      var pts = [];
+      for (var s = 0; s < fac.series.length; s++) {
+        var sp = seriesMap[fac.series[s]] || [];
+        for (var j = 0; j < sp.length; j++) pts.push(sp[j]);
+      }
+      if (pts.length === 0) continue;
+
+      var xMin = Infinity, xMax = -Infinity, yMin = Infinity, yMax = -Infinity;
+      for (var i = 0; i < pts.length; i++) {
+        if (pts[i].resolution < xMin) xMin = pts[i].resolution;
+        if (pts[i].resolution > xMax) xMax = pts[i].resolution;
+        if (pts[i].error < yMin) yMin = pts[i].error;
+        if (pts[i].error > yMax) yMax = pts[i].error;
+      }
+
+      xMin = xMin * 0.8;
+      xMax = xMax * 1.2;
+      yMin = Math.max(yMin * 0.5, 1e-8);
+      yMax = yMax * 1.8;
+
+      var div = document.createElement("div");
+      div.className = "facet";
+      div.innerHTML = '<h3 id="' + fac.id + '-title">' + fac.title + '</h3>' +
+                      '<p>' + fac.note + '</p>' +
+                      '<div class="viz" id="' + fac.id + '-viz"></div>' +
+                      '<ul class="legend" id="' + fac.id + '-legend"></ul>';
+      frag.appendChild(div);
+
+      var vizEl = document.getElementById(fac.id + "-viz");
+      var legendEl = document.getElementById(fac.id + "-legend");
+      if (vizEl && legendEl) {
+        buildFacetChart(vizEl, fac.id + "-title", fac.series, xMin, xMax, yMin, yMax, fac.guides);
+        legendEl.innerHTML = legendHTML(fac.series);
+      }
+    }
+
+    document.getElementById("facets").appendChild(frag);
+  }
+
+  /* ---- orders table ---- */
+  function renderOrders() {
+    var tbody = document.getElementById("orders-body");
+    if (!tbody) return;
+    var rows = [];
+    for (var i = 0; i < displayOrder.length; i++) {
+      var name = displayOrder[i];
+      var pts = seriesMap[name] || [];
+      var o = fittedOrder(pts);
+      var e = expected[name];
+      var cls = (o !== null && Math.abs(o - e) < 0.15) ? "good" : "bad";
+      var statusText = (o !== null && Math.abs(o - e) < 0.15) ? "matches theory" :
+                       (o !== null && o < e) ? "below theory" : "above theory";
+      rows.push('<tr><th scope="row">' + name.replace(/<br>/g, " ") + '</th>' +
+                '<td class="num">' + fmtOrd(o) + '</td>' +
+                '<td class="num">' + (e !== null ? e : "—") + '</td>' +
+                '<td class="' + cls + '">' + statusText + '</td></tr>');
+    }
+    tbody.innerHTML = rows.join("");
+  }
+
+  /* ---- detail table ---- */
+  function renderDetail() {
+    var wrap = document.getElementById("detail-table-wrap");
+    if (!wrap) return;
+
+    var parts = ['<table><thead><tr><th scope="col">Method</th><th scope="col">Resolution</th><th scope="col">Error</th><th scope="col">Fitted order</th></tr></thead><tbody>'];
+
+    for (var n = 0; n < displayOrder.length; n++) {
+      var name = displayOrder[n];
+      var pts = seriesMap[name] || [];
+      var o = fittedOrder(pts);
+      var rowspan = pts.length > 0 ? " rowspan=\"" + pts.length + "\"" : "";
+      var nameCell = '<th scope="row"' + rowspan + '>' + name.replace(/<br>/g, " ") + '</th>';
+      var orderCell = (o !== null) ? '<td class="ord-cell"' + rowspan + '>' + fmtOrd(o) + '</td>' : "";
+      var rows2 = [];
+      for (var j = 0; j < pts.length; j++) {
+        var p = pts[j];
+        var cellName = (j === 0) ? nameCell : '<th scope="row"></th>';
+        var cellOrd = (j === 0 && o !== null) ? orderCell : '<td class="ord-cell"></td>';
+        rows2.push('<tr>' + cellName +
+                   '<td class="num">' + p.resolution + '</td>' +
+                   '<td class="num">' + fmtExp(p.error) + '</td>' +
+                   cellOrd + '</tr>');
+      }
+      parts.push(rows2.join(""));
+    }
+
+    parts.push('</tbody></table>');
+    wrap.innerHTML = parts.join("");
+  }
+
+  /* ---- init ---- */
+  function init() {
+    var useFallback = false;
+
+    fetch(csvPath).then(function (r) {
+      if (!r.ok) { useFallback = true; return null; }
+      return r.text();
+    }).then(function (text) {
+      if (text !== null) {
+        var data = parseCSV(text);
+        buildSeriesMap(data);
+      }
+      loaded = true;
+      renderHero();
+      renderFacets();
+      renderOrders();
+      renderDetail();
+    }).catch(function () {
+      useFallback = true;
+      loaded = true;
+
+      // Static fallback values from convergence.csv (embedded so page works offline / file://)
+      seriesMap["Implicit Euler"] = [
+        { resolution: 10, error: 1.043058754865e-1 },
+        { resolution: 20, error: 5.233600863510e-2 },
+        { resolution: 40, error: 2.622414432480e-2 },
+        { resolution: 80, error: 1.313804988913e-2 }
+      ];
+      seriesMap["Crank-Nicolson (no start-up)"] = [
+        { resolution: 10, error: 1.952882351638e-1 },
+        { resolution: 20, error: 9.627726910159e-2 },
+        { resolution: 40, error: 4.431391022245e-2 },
+        { resolution: 80, error: 1.572076850032e-2 }
+      ];
+      seriesMap["Crank-Nicolson + Rannacher"] = [
+        { resolution: 10, error: 8.089819682702e-3 },
+        { resolution: 20, error: 2.037593754917e-3 },
+        { resolution: 40, error: 5.332251256061e-4 },
+        { resolution: 80, error: 1.576185335015e-4 }
+      ];
+      seriesMap["Binomial CRR"] = [
+        { resolution: 250, error: 7.994859563640e-3 },
+        { resolution: 500, error: 3.998435739025e-3 },
+        { resolution: 1000, error: 1.999468420992e-3 },
+        { resolution: 2000, error: 9.997967276227e-4 }
+      ];
+      seriesMap["Finite difference (space)"] = [
+        { resolution: 100, error: 1.303988640306e-2 },
+        { resolution: 200, error: 3.249225476768e-3 },
+        { resolution: 400, error: 8.116393746391e-4 }
+      ];
+      seriesMap["P1 finite elements"] = [
+        { resolution: 100, error: 4.708099089875e-3 },
+        { resolution: 200, error: 1.177449686157e-3 },
+        { resolution: 400, error: 2.943889073066e-4 }
+      ];
+      seriesMap["Monte Carlo std. error"] = [
+        { resolution: 2000, error: 3.334801307086e-1 },
+        { resolution: 8000, error: 1.635162338778e-1 },
+        { resolution: 32000, error: 8.268756400167e-2 },
+        { resolution: 128000, error: 4.107061226169e-2 }
+      ];
+
+      renderHero();
+      renderFacets();
+      renderOrders();
+      renderDetail();
+    });
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", init);
+  } else {
+    init();
+  }
+})();
+</script>
 
 </body>
 </html>
