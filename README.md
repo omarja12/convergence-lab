@@ -1,8 +1,13 @@
-# black-scholes-pde
+# convergence-lab
 
 The Black–Scholes PDE solved four ways in C++20 — lattices, finite differences,
 finite elements and Monte Carlo — with every scheme measured against the closed
 form, and **every convergence rate verified rather than asserted**.
+
+The name is the point. Getting close to the analytic price is easy and proves
+little. What this repository tests is whether each scheme converges at the rate
+its theory promises — and it documents one well-known case where the textbook
+rate is simply not achieved.
 
 ```
 $ ./build/bspde_tests
