@@ -10,7 +10,7 @@ its theory promises — and it documents one well-known case where the textbook
 rate is simply not achieved.
 
 ```
-$ ./build/bspde_tests
+$ ./build/convergence_tests
 ...
 18/18 checks passed
 ```
@@ -77,8 +77,8 @@ effect is not masked.
 
 ```bash
 cmake -B build -DCMAKE_BUILD_TYPE=Release && cmake --build build
-./build/bspde_tests      # 18 checks
-./build/bspde_demo       # prices one contract every way, with errors
+./build/convergence_tests      # 18 checks
+./build/convergence_demo       # prices one contract every way, with errors
 ```
 
 No CMake? There is no dependency beyond a C++20 compiler:
@@ -91,10 +91,10 @@ build.bat                # MSVC; finds vcvars64.bat itself
 Header-only. To use it in something else, add `include/` to your path.
 
 ```cpp
-#include "bspde/option.hpp"
-#include "bspde/finite_difference.hpp"
+#include "convergence/option.hpp"
+#include "convergence/finite_difference.hpp"
 
-using namespace bspde;
+using namespace convergence;
 Option  opt{100.0, 1.0, OptionType::Call, Exercise::European};
 Market  mkt{100.0, 0.05, 0.20, 0.0};
 
@@ -106,24 +106,24 @@ auto r = finite_difference(opt, mkt, cfg);
 
 ## What is implemented
 
-**Lattices** — `include/bspde/lattice.hpp`
+**Lattices** — `include/convergence/lattice.hpp`
 Binomial in three parameterisations (Cox–Ross–Rubinstein, Jarrow–Rudd, Tian) and
 the Boyle trinomial. American exercise by taking the payoff maximum at every
 node. The tree refuses to price when the time step drives the risk-neutral
 probability outside [0,1], rather than returning an arbitrageable number.
 
-**Finite differences** — `include/bspde/finite_difference.hpp`
+**Finite differences** — `include/convergence/finite_difference.hpp`
 The whole θ-family: explicit (θ=0), Crank–Nicolson (θ=½), implicit (θ=1), with
 Rannacher start-up. Tridiagonal solves by the Thomas algorithm. The explicit
 scheme reports its own stability ratio, which must not exceed ½.
 
-**Finite elements** — `include/bspde/finite_element.hpp`
+**Finite elements** — `include/convergence/finite_element.hpp`
 Galerkin with P1 hat functions, both consistent and lumped mass matrices, on the
 same θ time-stepping. Lumping the mass matrix reproduces the finite-difference
 scheme to 2e-6 — an equivalence the test suite demonstrates rather than
 mentions.
 
-**Monte Carlo** — `include/bspde/monte_carlo.hpp`
+**Monte Carlo** — `include/convergence/monte_carlo.hpp`
 Exact terminal sampling, Euler–Maruyama and Milstein, with antithetic variates
 and a control variate on the terminal spot. Measured variance reduction: **7.5×**
 tighter standard error at the same path count. Every result carries a standard
@@ -157,13 +157,13 @@ hidden because it is inconvenient.
 ## Layout
 
 ```
-include/bspde/option.hpp              contract, market, closed form and Greeks
-include/bspde/lattice.hpp             binomial x3, trinomial
-include/bspde/finite_difference.hpp   theta-family, Thomas solver, Rannacher
-include/bspde/finite_element.hpp      Galerkin P1, consistent and lumped mass
-include/bspde/monte_carlo.hpp         exact / Euler / Milstein, variance reduction
-src/main.cpp                          comparison table
-tests/test_convergence.cpp            18 checks, orders and edge cases
+include/convergence/option.hpp             contract, market, closed form and Greeks
+include/convergence/lattice.hpp            binomial x3, trinomial
+include/convergence/finite_difference.hpp  theta-family, Thomas solver, Rannacher
+include/convergence/finite_element.hpp     Galerkin P1, consistent and lumped mass
+include/convergence/monte_carlo.hpp        exact / Euler / Milstein, variance reduction
+src/main.cpp                               comparison table
+tests/test_convergence.cpp                 18 checks, orders and edge cases
 ```
 
 ## References

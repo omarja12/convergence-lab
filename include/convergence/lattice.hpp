@@ -12,7 +12,7 @@
 
 #include "option.hpp"
 
-namespace bspde {
+namespace convergence {
 
 enum class BinomialModel {
     CoxRossRubinstein,  // u = 1/d, the standard choice
@@ -163,4 +163,4 @@ inline LatticeParams binomial_params(BinomialModel model, double dt, double r,
     return {value[static_cast<std::size_t>(steps)], steps};
 }
 
-}  // namespace bspde
+}  // namespace convergence

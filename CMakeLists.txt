@@ -9,21 +9,21 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
   set(CMAKE_BUILD_TYPE Release CACHE STRING "" FORCE)
 endif()
 
-# Header-only library: everything lives in include/bspde.
-add_library(bspde INTERFACE)
-target_include_directories(bspde INTERFACE
+# Header-only library: everything lives in include/convergence.
+add_library(convergence INTERFACE)
+target_include_directories(convergence INTERFACE
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>)
 
 if(MSVC)
-  target_compile_options(bspde INTERFACE /W4 /permissive- /Zc:__cplusplus)
+  target_compile_options(convergence INTERFACE /W4 /permissive- /Zc:__cplusplus)
 else()
-  target_compile_options(bspde INTERFACE -Wall -Wextra -Wpedantic)
+  target_compile_options(convergence INTERFACE -Wall -Wextra -Wpedantic)
 endif()
 
-add_executable(bspde_demo src/main.cpp)
-target_link_libraries(bspde_demo PRIVATE bspde)
+add_executable(convergence_demo src/main.cpp)
+target_link_libraries(convergence_demo PRIVATE convergence)
 
 enable_testing()
-add_executable(bspde_tests tests/test_convergence.cpp)
-target_link_libraries(bspde_tests PRIVATE bspde)
-add_test(NAME convergence COMMAND bspde_tests)
+add_executable(convergence_tests tests/test_convergence.cpp)
+target_link_libraries(convergence_tests PRIVATE convergence)
+add_test(NAME convergence COMMAND convergence_tests)

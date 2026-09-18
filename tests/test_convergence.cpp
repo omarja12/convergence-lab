@@ -15,13 +15,13 @@
 #include <string>
 #include <vector>
 
-#include "bspde/finite_difference.hpp"
-#include "bspde/finite_element.hpp"
-#include "bspde/lattice.hpp"
-#include "bspde/monte_carlo.hpp"
-#include "bspde/option.hpp"
+#include "convergence/finite_difference.hpp"
+#include "convergence/finite_element.hpp"
+#include "convergence/lattice.hpp"
+#include "convergence/monte_carlo.hpp"
+#include "convergence/option.hpp"
 
-using namespace bspde;
+using namespace convergence;
 
 namespace {
 

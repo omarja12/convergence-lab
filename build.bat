@@ -44,8 +44,8 @@ if errorlevel 1 exit /b 1
 :compile
 if not exist build mkdir build
 set "FLAGS=/nologo /std:c++20 /EHsc /O2 /W4 /Zc:__cplusplus /I include"
-cl %FLAGS% src\main.cpp /Fe:build\bspde_demo.exe /Fo:build\ || exit /b 1
-cl %FLAGS% tests\test_convergence.cpp /Fe:build\bspde_tests.exe /Fo:build\ || exit /b 1
+cl %FLAGS% src\main.cpp /Fe:build\convergence_demo.exe /Fo:build\ || exit /b 1
+cl %FLAGS% tests\test_convergence.cpp /Fe:build\convergence_tests.exe /Fo:build\ || exit /b 1
 echo.
-echo Built build\bspde_demo.exe and build\bspde_tests.exe
+echo Built build\convergence_demo.exe and build\convergence_tests.exe
 exit /b 0

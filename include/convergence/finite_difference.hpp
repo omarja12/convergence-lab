@@ -23,7 +23,7 @@
 
 #include "option.hpp"
 
-namespace bspde {
+namespace convergence {
 
 enum class FdScheme { Explicit, Implicit, CrankNicolson };
 
@@ -230,4 +230,4 @@ inline void solve_tridiagonal(const std::vector<double>& lower,
     return out;
 }
 
-}  // namespace bspde
+}  // namespace convergence

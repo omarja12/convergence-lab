@@ -26,7 +26,7 @@
 
 #include "option.hpp"
 
-namespace bspde {
+namespace convergence {
 
 enum class McScheme { Exact, Euler, Milstein };
 
@@ -156,4 +156,4 @@ inline double terminal_spot(McScheme scheme, double s0, double drift, double sig
     return out;
 }
 
-}  // namespace bspde
+}  // namespace convergence

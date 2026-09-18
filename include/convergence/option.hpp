@@ -10,7 +10,7 @@
 #include <cmath>
 #include <stdexcept>
 
-namespace bspde {
+namespace convergence {
 
 enum class OptionType { Call, Put };
 enum class Exercise { European, American };
@@ -105,4 +105,4 @@ struct Greeks {
     return analytic(opt, mkt).price;
 }
 
-}  // namespace bspde
+}  // namespace convergence

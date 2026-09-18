@@ -26,7 +26,7 @@
 #include "finite_difference.hpp"  // solve_tridiagonal, FdScheme, theta_of
 #include "option.hpp"
 
-namespace bspde {
+namespace convergence {
 
 enum class MassMatrix {
     Consistent,  // true Galerkin: M = h/6 * tridiag(1, 4, 1)
@@ -145,4 +145,4 @@ struct FemResult {
     return {price, cfg.elements};
 }
 
-}  // namespace bspde
+}  // namespace convergence
