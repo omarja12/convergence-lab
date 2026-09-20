@@ -7,6 +7,22 @@
 <meta name="description" content="Monte Carlo pricing of the Black-Scholes contract: exact terminal sampling, Euler-Maruyama, Milstein, antithetic variates, control variates, and why every result carries a standard error.">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="reference.css">
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+  renderMathInElement(document.body, {
+    delimiters: [
+      {left: "\\[", right: "\\]", display: true},
+      {left: "$", right: "$", display: false}
+    ],
+    throwOnError: false
+  });
+});
+</script>
+
 </head>
 <body>
 
@@ -72,10 +88,8 @@ each path, discount, and average. The price is unbiased for any finite number of
 paths; what improves with more paths is the precision, measured by the standard
 error, which falls as <code>1/√N</code>.</p>
 
-<div class="formula"><code>
-price = e^{-rT} · (1/N) Σ payoff(S_T^{(i)})
-standard error ∝ 1/√N
-</code></div>
+<div class="formula">[price = e^{-rT} \cdot \frac{1}{N} \sum \text{payoff}(S_T^{(i)}) \\
+standard error \propto 1/\sqrt{N}]</div>
 
 <p>The implementation is built around three questions a reader should be able to
 answer from the code: how do you get to the terminal spot, how do you reduce the
@@ -96,9 +110,7 @@ variance, and how do you know the number you printed is anywhere near the truth?
 
 <p>The dynamics under the risk-neutral measure are geometric Brownian motion:</p>
 
-<div class="formula"><code>
-dS = (r - q) S dt + σ S dW
-</code></div>
+<div class="formula">[dS = (r - q) S\, dt + \sigma S\, dW]</div>
 
 <p>There are three ways to integrate this to maturity, and the implementation
 gives you all three so you can see what each one costs:</p>
@@ -126,9 +138,7 @@ sampling, and the bias clearly shrinks with the step count.</div>
 <p>Geometric Brownian motion is integrable, so the terminal spot can be drawn
 directly:</p>
 
-<div class="formula"><code>
-S_T = S_0 · exp( (r - q - σ²/2) T + σ √T · Z ),   Z ~ N(0,1)
-</code></div>
+<div class="formula">[S_T = S_0 \cdot \exp!\big((r - q - \tfrac{1}{2}\sigma^2) T + \sigma \sqrt{T} \cdot Z\big), \qquad Z \sim N(0,1)]</div>
 
 <p>One normal draw per path, no time-stepping, no discretisation error. Any bias
 in an exact-sampling price is pure sampling noise — the kind that the standard
@@ -149,9 +159,7 @@ the one that makes the fewest assumptions.</p>
 <p>The simplest discretisation of an SDE. Replace the differential with a finite
 step:</p>
 
-<div class="formula"><code>
-S_{t+Δt} = S_t + (r-q) S_t Δt + σ S_t √Δt · Z_t
-</code></div>
+<div class="formula">[S_{t+Δt} = S_t + (r-q) S_t Δt + σ S_t √Δt · Z_t]</div>
 
 <p>Weak order 1 — the expected value converges at <code>O(Δt)</code>. For a
 European option the bias is small at reasonable step counts, but it is there, and
@@ -166,10 +174,8 @@ real source of bias, not a formality.</p>
 
 <p>Adds the Stratonovich correction term to the Euler step:</p>
 
-<div class="formula"><code>
-S_{t+Δt} = S_t + (r-q) S_t Δt + σ S_t √Δt · Z_t
-           + ½ σ² S_t (Δt · Z_t² - Δt)
-</code></div>
+<div class="formula">[S_{t+Δt} = S_t + (r-q) S_t Δt + σ S_t √Δt · Z_t
+           + ½ σ² S_t (Δt · Z_t² - Δt)]</div>
 
 <p>Strong order 1 — the pathwise error converges at <code>O(Δt)</code>, better
 than Euler’s <code>O(√Δt)</code>. For a European option the weak-order bias is
@@ -212,9 +218,7 @@ correlated with the option payoff (especially for a call), so subtracting a
 β-weighted deviation of <code>S_T - forward</code> from the payoff removes much of
 the variance without biasing the result:</p>
 
-<div class="formula"><code>
-adjusted_payoff = payoff(S_T) - β · (S_T - forward)
-</code></div>
+<div class="formula">[\text{adjusted_payoff} = \text{payoff}(S_T) - \beta \cdot (S_T - \text{forward})]</div>
 
 <p>The β is estimated on a small pilot run and then held fixed for the main
 simulation. Estimating β on the same paths it corrects would bias the result; the
@@ -231,9 +235,7 @@ sum += payoff - beta * (control - forward);</code></pre>
 <p>The forward used in the control is the risk-neutral expectation of the terminal
 spot:</p>
 
-<div class="formula"><code>
-forward = S_0 · exp((r - q) T)
-</code></div>
+<div class="formula">[\text{forward} = S_0 \cdot \exp((r - q) T)]</div>
 </section>
 
 <section id="interval">
@@ -242,11 +244,9 @@ forward = S_0 · exp((r - q) T)
 <p>Every result carries a standard error, computed from the sample variance of the
 adjusted payoffs with Bessel’s correction:</p>
 
-<div class="formula"><code>
-mean = (1/N) Σ adjusted
-var  = (Σ adjusted² / N - mean²) · N / (N-1)
-standard error = disc · √(max(var, 0) / N)
-</code></div>
+<div class="formula">[mean = \frac{1}{N} \sum \text{adjusted} \\
+var = \left(\frac{\sum \text{adjusted}^2}{N} - \text{mean}^2\right) \cdot \frac{N}{N-1} \\
+standard error = disc \cdot \sqrt{\max(var, 0) / N}]</div>
 
 <p>The discount factor is applied after the mean and standard error are computed,
 so they are stated in present-value terms. The 95% interval is

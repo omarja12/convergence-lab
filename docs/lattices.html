@@ -7,6 +7,22 @@
 <meta name="description" content="Binomial trees in three parameterisations — Cox–Ross–Rubinstein, Jarrow–Rudd, Tian — and the Boyle trinomial. How moment matching shapes convergence, not just the price.">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="reference.css">
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+  renderMathInElement(document.body, {
+    delimiters: [
+      {left: "\\[", right: "\\]", display: true},
+      {left: "$", right: "$", display: false}
+    ],
+    throwOnError: false
+  });
+});
+</script>
+
 </head>
 <body>
 
@@ -92,9 +108,7 @@ underlying scheme is the same.</p>
 and the up-probability is set so the tree matches the first two moments of the
 risk-neutral distribution:</p>
 
-<div class="formula"><code>
-  u = exp(σ √Δt)        d = 1/u        p = (e^{(r-q)Δt} - d) / (u - d)
-</code></div>
+<div class="formula">[u = \exp(\sigma \sqrt{\Delta t}) \qquad d = 1/u \qquad p = \frac{e^{(r-q)\Delta t} - d}{u - d}]</div>
 
 <p>The symmetry is what makes CRR the textbook default, but it also makes the
 tree sensitive to strike placement. When the spot equals the strike and the step
@@ -119,9 +133,7 @@ JR here would report a property of the node alignment, not of the scheme.</div>
 <p>Equal probabilities, <code>p = 1/2</code>. The drift is absorbed into the node
 spacing instead of into the probability:</p>
 
-<div class="formula"><code>
-  u = exp((r - q - σ²/2)Δt + σ√Δt)        d = exp((r - q - σ²/2)Δt - σ√Δt)
-</code></div>
+<div class="formula">[u = \exp!\big((r - q - \tfrac{1}{2}\sigma^2)\Delta t + \sigma\sqrt{\Delta t}\big) \qquad d = \exp!\big((r - q - \tfrac{1}{2}\sigma^2)\Delta t - \sigma\sqrt{\Delta t}\big)]</div>
 
 <p>This choice makes the tree’s node centres track the forward mean, which is
 appealing when the strike is far from spot. It also makes the convergence
@@ -137,11 +149,9 @@ the test suite does not use it for the order check, and says so.</p>
 <p>Matches the first <em>three</em> moments of the log-normal distribution exactly,
 which buys a smaller truncation error at a given step count:</p>
 
-<div class="formula"><code>
-  v = e^{σ²Δt}
-  u = ½ e^{(r-q)Δt} v (v + 1 + √(v² + 2v - 3))
-  d = ½ e^{(r-q)Δt} v (v + 1 - √(v² + 2v - 3))
-</code></div>
+<div class="formula">[v = e^{\sigma^2 \Delta t} \\
+u = \frac{1}{2} e^{(r-q)\Delta t} v \big(v + 1 + \sqrt{v^2 + 2v - 3}\big) \\
+d = \frac{1}{2} e^{(r-q)\Delta t} v \big(v + 1 - \sqrt{v^2 + 2v - 3}\big)]</div>
 
 <p>Tian is the most accurate of the three binomials at a fixed <code>n</code>, but
 it is still first order. The implementation includes it so the tree module covers
@@ -157,12 +167,10 @@ and the usual choice <code>dx = σ√(3Δt)</code> keeps all three transition
 probabilities positive while giving the same <code>O(1/n)</code> convergence with
 a smaller constant than the binomial:</p>
 
-<div class="formula"><code>
-  dx = σ√(3Δt)
-  p↑ = ½ ((σ²Δt + ν²Δt²)/dx² + νΔt/dx)
-  p↓ = ½ ((σ²Δt + ν²Δt²)/dx² - νΔt/dx)
-  p· = 1 - p↑ - p↓
-</code></div>
+<div class="formula">[dx = \sigma\sqrt{3\Delta t} \\
+p_{\uparrow} = \frac{1}{2}\left(\frac{\sigma^2\Delta t + \nu^2\Delta t^2}{dx^2} + \frac{\nu\Delta t}{dx}\right) \\
+p_{\downarrow} = \frac{1}{2}\left(\frac{\sigma^2\Delta t + \nu^2\Delta t^2}{dx^2} - \frac{\nu\Delta t}{dx}\right) \\
+p_{\bullet} = 1 - p_{\uparrow} - p_{\downarrow}]</div>
 
 <p>where <code>ν = r - q - σ²/2</code>.</p>
 

@@ -7,6 +7,22 @@
 <meta name="description" content="Galerkin finite elements on the log-transformed Black-Scholes PDE: P1 hat basis, consistent and lumped mass matrices, and why lumping recovers the finite-difference scheme to 2e-6.">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="reference.css">
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+  renderMathInElement(document.body, {
+    delimiters: [
+      {left: "\\[", right: "\\]", display: true},
+      {left: "$", right: "$", display: false}
+    ],
+    throwOnError: false
+  });
+});
+</script>
+
 </head>
 <body>
 
@@ -66,17 +82,13 @@
 <p>The PDE is the same one the finite-difference module solves — in
 <code>x = ln S</code>, forward in <code>τ = T - t</code>:</p>
 
-<div class="formula"><code>
-dV/dτ = a · d²V/dx² + b · dV/dx - rV
-</code></div>
+<div class="formula">[\frac{dV}{d\tau} = a \frac{d^2V}{dx^2} + b \frac{dV}{dx} - rV]</div>
 
 <p>with <code>a = σ²/2</code> and <code>b = r - q - σ²/2</code>. The finite
 element method does not discretise this directly. It multiplies by a test
 function <code>φ</code> and integrates the second derivative by parts:</p>
 
-<div class="formula"><code>
-(dV/dτ, φ) = -a (V', φ') + b (V', φ) - r (V, φ)
-</code></div>
+<div class="formula">[\left(\frac{dV}{d\tau}, \varphi\right) = -a\,(V', \varphi') + b\,(V', \varphi) - r\,(V, \varphi)]</div>
 
 <p>where <code>(f, g)</code> denotes the inner product over the domain. The
 second derivative is gone; what remains is first derivatives of both the
@@ -118,9 +130,7 @@ assembled system couples only the node and its two neighbours.</p>
 <p>Writing <code>V(x) = Σ vⱼ φⱼ(x)</code> and taking each hat as a test function
 gives one equation per interior node. The system is:</p>
 
-<div class="formula"><code>
-M dV/dτ = A V      where      A = -a K + b B - r M
-</code></div>
+<div class="formula">[M \frac{dV}{d\tau} = A V \qquad\text{where}\qquad A = -a K + b B - r M]</div>
 
 <p><code>M</code> is the mass matrix, <code>K</code> the stiffness matrix, and
 <code>B</code> the convection matrix. All three are tridiagonal, so the θ-time-
@@ -200,9 +210,7 @@ claim.</div>
 <p>Lumping the mass matrix collapses the off-diagonal coupling in the time term to
 zero and sets the diagonal to <code>h</code>. The system that results is:</p>
 
-<div class="formula"><code>
-h · (dV/dτ)_i = (-a K + b B - r h I) V   →   dV/dτ = (-a/h K + b/h B - r I) V
-</code></div>
+<div class="formula">[h \cdot (dV/d\tau)_i = (-a K + b B - r h I)\, V \;\to\; \frac{dV}{d\tau} = (-\tfrac{a}{h} K + \tfrac{b}{h} B - r I)\, V]</div>
 
 <p>The <code>-a/h K + b/h B - r I</code> row is, element by element, the same as
 the finite-difference operator row <code>α, β, γ</code> — the stiffness gives
