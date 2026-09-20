@@ -3,629 +3,243 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>convergence-lab — Omar Jarir</title>
+<title>convergence-lab — method reference</title>
 <meta name="description" content="The Black-Scholes PDE solved four ways in C++20 — lattices, finite difference, finite element and Monte Carlo — with every convergence rate measured, including the Crank-Nicolson order loss that Rannacher start-up fixes.">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="reference.css">
 <style>
-/* ===== shared shell ===== */
-:root {
-  --bg: #f7f4ef;
-  --surface: #ffffff;
-  --surface-2: #faf8f4;
-  --border: #e3ded5;
-  --border-mid: #cfc8bb;
-  --ink: #1c1a17;
-  --ink-mid: #5a544c;
-  --ink-soft: #8a8378;
-  --accent: #b5763a;
-  --accent-soft: #d4a574;
-  --accent-bg: #f5ede4;
-  --good: #4a7c4e;
-  --bad: #b4462f;
-
-  --sans: ui-sans-serif, -apple-system, "Segoe UI", Roboto, system-ui, sans-serif;
-  --serif: ui-serif, Georgia, "Times New Roman", serif;
-  --mono: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
-
-  --measure: 68ch;
-  --gutter: 22px;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --bg: #14130f;
-    --surface: #1c1a16;
-    --surface-2: #221f1a;
-    --border: #2e2a24;
-    --border-mid: #433d34;
-    --ink: #f0ece4;
-    --ink-mid: #b3aca1;
-    --ink-soft: #9a9287;
-    --accent: #d9a066;
-    --accent-soft: #c48a4a;
-    --accent-bg: #26211a;
-    --good: #6aad6e;
-    --bad: #e07a5e;
-  }
-}
-:root[data-theme="dark"] {
-  --bg: #14130f;
-  --surface: #1c1a16;
-  --surface-2: #221f1a;
-  --border: #2e2a24;
-  --border-mid: #433d34;
-  --ink: #f0ece4;
-  --ink-mid: #b3aca1;
-  --ink-soft: #9a9287;
-  --accent: #d9a066;
-  --accent-soft: #c48a4a;
-  --accent-bg: #26211a;
-  --good: #6aad6e;
-  --bad: #e07a5e;
-}
-
-* { box-sizing: border-box; }
-html { -webkit-text-size-adjust: 100%; scroll-behavior: smooth; }
-
-body {
-  margin: 0;
-  background: var(--bg);
-  color: var(--ink);
-  font-family: var(--sans);
-  font-size: 16px;
-  line-height: 1.65;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
-
-.wrap {
-  max-width: 1080px;
-  margin: 0 auto;
-  padding: 0 var(--gutter);
-}
-
-/* ===== header ===== */
-.site-head {
-  padding: 68px 0 14px;
-}
-.brand {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  margin: 0 0 32px;
-  color: var(--accent);
-  text-decoration: none;
-  transition: color .15s ease;
-}
-.brand:hover { color: var(--accent-soft); }
-.brand svg { display: block; width: 36px; height: 29px; }
-
-.brand-word {
-  font-family: var(--mono);
-  font-size: 0.72rem;
-  font-weight: 600;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: var(--ink-soft);
-  transition: color .15s ease;
-}
-.brand:hover .brand-word { color: var(--accent); }
-
-.site-name {
-  font-size: clamp(2rem, 5.5vw, 2.85rem);
-  font-weight: 630;
-  letter-spacing: -0.026em;
-  margin: 0;
-  line-height: 1.1;
-  font-family: var(--serif);
-}
-
-.site-tagline {
-  margin: 16px 0 0;
-  font-size: clamp(1rem, 2.2vw, 1.14rem);
-  color: var(--ink-mid);
-  max-width: var(--measure);
-  line-height: 1.55;
-}
-
-/* ===== article ===== */
-.article { max-width: var(--measure); }
-
-.article h2 {
-  margin: 60px 0 0;
-  font-size: 1.5rem;
-  font-weight: 630;
-  letter-spacing: -0.02em;
-  line-height: 1.25;
-  font-family: var(--serif);
-}
-
-.article h3 {
-  margin: 38px 0 0;
-  font-size: 1.08rem;
-  font-weight: 620;
-}
-
-.article p { margin: 16px 0 0; }
-
-.article ul, .article ol { margin: 16px 0 0; padding-left: 24px; }
-.article li { margin: 8px 0 0; }
-
-.article strong { font-weight: 640; }
-
-.article a {
-  color: var(--accent);
-  text-decoration: none;
-  font-weight: 530;
-}
-.article a:hover { text-decoration: underline; }
-
-.article code {
-  font-family: var(--mono);
-  font-size: 0.86em;
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  padding: 1px 5px;
-  color: var(--ink);
-}
-
-pre {
-  margin: 22px 0 0;
-  padding: 18px 20px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  overflow-x: auto;
-  font-family: var(--mono);
-  font-size: 0.84rem;
-  line-height: 1.6;
-  color: var(--ink-mid);
-}
-pre code {
-  background: none;
-  border: 0;
-  padding: 0;
-  font-size: inherit;
-  color: inherit;
-}
-
-/* ===== lede ===== */
-.lede {
-  font-size: 1.12rem;
-  color: var(--ink-mid);
-  line-height: 1.6;
-}
-
-/* ===== result callout ===== */
-.result {
-  margin: 36px 0 0;
-  padding: 24px 28px;
-  background: var(--accent-bg);
-  border-left: 3px solid var(--accent);
-  border-radius: 0 10px 10px 0;
-}
-.result p { margin: 0; font-size: 1.02rem; }
-.result p + p { margin-top: 11px; color: var(--ink-mid); }
-.result strong { font-weight: 650; }
-
-/* ===== implementation cards ===== */
-.impl-list {
-  list-style: none;
-  margin: 20px 0 0;
-  padding: 0;
-  display: grid;
-  gap: 14px;
-}
-.impl-list li {
-  padding: 18px 22px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-}
-.impl-list li strong {
-  display: block;
-  font-size: 1rem;
-  font-weight: 630;
-  margin-bottom: 4px;
-  color: var(--ink);
-}
-.impl-list li p {
-  margin: 0;
-  font-size: 0.9rem;
-  color: var(--ink-mid);
-  line-height: 1.55;
-}
-
-/* ===== back link ===== */
-.back-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  margin: 36px 0 0;
-  font-family: var(--mono);
-  font-size: 0.78rem;
-  color: var(--ink-soft);
-  text-decoration: none;
-}
-.back-link:hover { color: var(--accent); }
-.back-link svg { width: 13px; height: 13px; }
-
-/* ===== footer ===== */
-.site-foot {
-  margin: 56px 0 0;
-  padding: 26px 0 52px;
-  border-top: 1px solid var(--border);
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px 28px;
-  align-items: center;
-  font-size: 0.9rem;
-  color: var(--ink-soft);
-}
-.site-foot span { color: var(--ink-mid); }
-.site-foot a {
-  color: var(--ink-mid);
-  text-decoration: none;
-}
-.site-foot a:hover { color: var(--accent); }
-
-/* ===== chart ===== */
-.viz {
-  width: 100%;
-  max-width: 1008px;
-  margin: 34px 0 0;
-  --series-1: #2a78d6;
-  --series-2: #c4521e;
-  --series-3: #1baf7a;
-  --series-4: #8a6a9e;
-}
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .viz {
-    --series-1: #3987e5;
-    --series-2: #d95926;
-    --series-3: #199e70;
-    --series-4: #a088b8;
-  }
-}
-:root[data-theme="dark"] .viz {
-  --series-1: #3987e5;
-  --series-2: #d95926;
-  --series-3: #199e70;
-  --series-4: #a088b8;
-}
-
+.viz { width: 100%; max-width: 1008px; margin: 28px 0 0; }
 .viz svg { width: 100%; height: auto; display: block; }
-
-.viz .grid     { stroke: var(--border); stroke-width: 1; }
-.viz .tick     { fill: var(--ink-soft); font-family: var(--mono); font-size: 10px;
-                 font-variant-numeric: tabular-nums; }
-.viz .exp      { font-size: 7px; }
-.viz .guide    { stroke: var(--border-mid); stroke-width: 1; stroke-dasharray: 4 3; }
+.viz .grid { stroke: var(--border); stroke-width: 1; }
+.viz .tick { fill: var(--ink-soft); font-family: var(--mono); font-size: 10px; font-variant-numeric: tabular-nums; }
+.viz .exp { font-size: 7px; }
+.viz .guide { stroke: var(--border-strong); stroke-width: 1; stroke-dasharray: 4 3; }
 .viz .guide-label { fill: var(--ink-soft); font-family: var(--mono); font-size: 9.5px; }
-.viz .line     { fill: none; stroke-width: 2.2; stroke-linejoin: round; stroke-linecap: round; }
-.viz .dot      { stroke: var(--surface); stroke-width: 2; }
+.viz .line { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.viz .dot { stroke: var(--surface); stroke-width: 2; }
 .viz .dot:hover { r: 6; }
 
-.legend {
-  list-style: none;
-  margin: 16px 0 0;
-  padding: 0;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 7px 24px;
-  font-size: 0.86rem;
-}
-.legend li { display: flex; align-items: center; gap: 9px; }
-.legend .swatch { width: 12px; height: 12px; border-radius: 3px; flex: none; }
-.legend .nm { color: var(--ink); font-weight: 530; }
-.legend .ord {
-  font-family: var(--mono);
-  font-size: 0.75rem;
-  color: var(--ink-soft);
-  font-variant-numeric: tabular-nums;
-}
+.legend { list-style: none; margin: 14px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px 22px; font-size: 0.85rem; }
+.legend li { display: flex; align-items: center; gap: 8px; }
+.legend .swatch { width: 11px; height: 11px; border-radius: 3px; flex: none; }
+.legend .nm { color: var(--ink-mid); }
+.legend .ord { font-family: var(--mono); font-size: 0.76rem; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
 
-.facets {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 32px;
-  margin: 36px 0 0;
-  width: 100%;
-  max-width: 1008px;
-}
-.facet { display: flex; flex-direction: column; }
-.facet .viz { width: 100%; }
-.facet h3 {
-  margin: 0 0 6px;
-  font-size: 1rem;
-  font-weight: 620;
-  color: var(--ink);
-}
-.facet p {
-  margin: 2px 0 0;
-  font-size: 0.84rem;
-  color: var(--ink-soft);
-  font-family: var(--mono);
-}
-.facet .legend {
-  margin-top: 14px;
-  flex-direction: column;
-  gap: 6px;
-}
-.facet .legend li { flex-wrap: wrap; }
+.axis-note { margin: 10px 0 0; font-size: 0.8rem; color: var(--ink-soft); font-family: var(--mono); }
 
-.axis-note {
-  margin: 12px 0 0;
-  font-size: 0.8rem;
-  color: var(--ink-soft);
-  font-family: var(--mono);
-}
+.result { margin: 24px 0 0; padding: 18px 20px; background: var(--accent-bg); border-left: 3px solid var(--accent); border-radius: 0 var(--radius) var(--radius) 0; }
+.result p { margin: 0; font-size: 0.96rem; }
+.result p + p { margin-top: 8px; color: var(--ink-mid); }
+.result strong { font-weight: 620; }
 
-/* ===== orders table ===== */
-.table-wrap { margin: 50px 0 0; overflow-x: auto; }
+.article table.orders { width: 100%; border-collapse: collapse; font-size: 0.86rem; margin: 16px 0 0; }
+.article table.orders th, .article table.orders td { text-align: left; padding: 6px 10px 6px 0; border-bottom: 1px solid var(--border); }
+.article table.orders thead th { font-family: var(--mono); font-size: 0.68rem; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-soft); font-weight: 600; }
+.article table.orders .num { font-family: var(--mono); font-variant-numeric: tabular-nums; color: var(--ink-mid); }
+.article table.orders .bad { color: var(--bad); font-weight: 600; }
+.article table.orders .good { color: var(--good); font-weight: 600; }
 
-table.orders {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.94rem;
-  min-width: 440px;
-}
-table.orders th, table.orders td {
-  text-align: left;
-  padding: 10px 14px 10px 0;
-  border-bottom: 1px solid var(--border);
-}
-table.orders thead th {
-  font-family: var(--mono);
-  font-size: 0.7rem;
-  text-transform: uppercase;
-  letter-spacing: 0.09em;
-  color: var(--ink-soft);
-  font-weight: 600;
-  padding-top: 14px;
-}
-table.orders .num {
-  font-family: var(--mono);
-  font-variant-numeric: tabular-nums;
-  color: var(--ink-mid);
-}
-table.orders .bad { color: var(--bad); font-weight: 600; }
-table.orders .good { color: var(--good); font-weight: 600; }
-table.orders th[scope="row"] {
-  font-weight: 560;
-  padding-top: 12px;
-}
-table.orders tbody tr:hover td { background: var(--surface-2); }
+.article details.data { margin: 24px 0 0; border-top: 1px solid var(--border); padding-top: 12px; }
+.article details.data summary { cursor: pointer; font-size: 0.82rem; color: var(--ink-mid); font-family: var(--mono); }
+.article details.data summary:hover { color: var(--accent); }
+.article details.data table { width: 100%; border-collapse: collapse; margin: 12px 0 0; font-size: 0.78rem; }
+.article details.data th, .article details.data td { text-align: left; padding: 4px 8px 4px 0; border-bottom: 1px solid var(--border); }
+.article details.data thead th { font-family: var(--mono); font-size: 0.64rem; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-soft); font-weight: 600; }
+.article details.data tbody th { font-weight: 550; vertical-align: top; padding-top: 6px; }
+.article details.data .num { font-family: var(--mono); font-variant-numeric: tabular-nums; color: var(--ink-mid); }
+.article details.data .ord-cell { vertical-align: top; padding-top: 6px; color: var(--accent); font-weight: 600; font-family: var(--mono); font-variant-numeric: tabular-nums; }
 
-/* ===== detail data table ===== */
-details.data {
-  margin: 38px 0 0;
-  border-top: 1px solid var(--border);
-  padding-top: 16px;
-}
-details.data summary {
-  cursor: pointer;
-  font-size: 0.88rem;
-  color: var(--ink-mid);
-  font-family: var(--mono);
-  letter-spacing: 0.02em;
-  outline: none;
-  padding: 4px 0;
-}
-details.data summary:hover { color: var(--accent); }
-details.data table {
-  width: 100%;
-  border-collapse: collapse;
-  margin: 16px 0 0;
-  font-size: 0.84rem;
-  min-width: 480px;
-}
-details.data th, details.data td {
-  text-align: left;
-  padding: 6px 12px 6px 0;
-  border-bottom: 1px solid var(--border);
-}
-details.data thead th {
-  font-family: var(--mono);
-  font-size: 0.68rem;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: var(--ink-soft);
-  font-weight: 600;
-  padding-top: 12px;
-}
-details.data .num {
-  font-family: var(--mono);
-  font-variant-numeric: tabular-nums;
-  color: var(--ink-mid);
-}
-details.data .ord-cell {
-  color: var(--accent);
-  font-weight: 600;
-  font-family: var(--mono);
-  font-variant-numeric: tabular-nums;
-  font-size: 0.8rem;
-}
+.impl-list { list-style: none; margin: 16px 0 0; padding: 0; display: grid; gap: 10px; }
+.impl-list li { padding: 12px 14px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); }
+.impl-list li strong { display: block; font-size: 0.92rem; font-weight: 620; margin-bottom: 3px; }
+.impl-list li p { margin: 0; font-size: 0.84rem; color: var(--ink-mid); line-height: 1.5; }
 
-/* ===== responsive ===== */
-@media (max-width: 880px) {
-  .facets { grid-template-columns: 1fr; }
-}
-
-/* ===== reduced motion ===== */
-@media (prefers-reduced-motion: reduce) {
-  * { transition: none !important; }
-}
-
-/* ===== loading state ===== */
-.loading-state {
-  text-align: center;
-  padding: 48px 24px;
-  color: var(--ink-soft);
-  font-family: var(--mono);
-  font-size: 0.85rem;
-}
+.section-rule { margin: 4px 0 0; border: 0; border-top: 1px solid var(--border); }
 </style>
 </head>
 <body>
 
 <div class="wrap">
 
-  <header class="site-head">
-    <a class="brand" href="https://omarja12.github.io/">
-      <svg viewBox="0 0 40 32" aria-hidden="true">
-        <path d="M2 27.5h36" stroke="currentColor" stroke-width="1" opacity=".22" stroke-linecap="round"/>
-        <path d="M3.5 22.5C5.5 12.5 9.5 7.5 13.5 8.6c8 2.2 15.5 7.4 23 11.4" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
-        <circle cx="3.5" cy="22.5" r="2.1" fill="currentColor"/>
-        <circle cx="13.5" cy="8.6" r="2.1" fill="currentColor"/>
-        <circle cx="36.5" cy="20" r="2.1" fill="currentColor"/>
-      </svg>
-      <span class="brand-word">Omar Jarir</span>
-    </a>
-    <h1 class="site-name">convergence-lab</h1>
-    <p class="site-tagline">The Black-Scholes PDE solved four ways in C++20 — lattices, finite difference, finite element and Monte Carlo — with every convergence rate measured, including the Crank-Nicolson order loss that Rannacher start-up fixes.</p>
-  </header>
+<header class="site-head">
+  <a class="brand" href="index.html">
+    <span class="repo-word">convergence-lab</span>
+    <span class="repo-name">/</span>
+    <span class="repo-name">methods</span>
+  </a>
+  <span style="font-family:var(--mono);font-size:0.7rem;color:var(--ink-soft)">C++20 · MIT</span>
+</header>
 
-  <main>
-    <article class="article">
+<nav class="method-nav" aria-label="Method pages">
+  <a href="lattices.html">Lattices</a>
+  <span class="sep">·</span>
+  <a href="finite-differences.html">Finite differences</a>
+  <span class="sep">·</span>
+  <a href="finite-elements.html">Finite elements</a>
+  <span class="sep">·</span>
+  <a href="monte-carlo.html">Monte Carlo</a>
+</nav>
 
-      <p class="lede">Any of these methods will land near the analytic price. That is a weak test. What separates a correct implementation from a plausible one is the <em>rate</em>.</p>
+<main class="article">
 
-      <p>A scheme with the drift term mis-signed often prices close too, if you only ever run it at one grid size. So nothing here is checked at one grid size. Every method is refined across a range of resolutions, and the observed order is fitted as the slope of <code>log₂(error)</code> against <code>log₂(resolution)</code>. A scheme that happens to be right at one resolution will not hold the right slope across all of them.</p>
+  <h2>The Black–Scholes PDE, solved four ways</h2>
 
-      <p>The resolutions plotted here are exactly those the C++ test suite asserts on. Fitting an order is sensitive to which points you fit it on, so sampling a different range for the picture would put a second, disagreeing set of numbers on this page.</p>
+  <p class="lede">Any of these methods will land near the analytic price. That is a weak test. What separates a correct implementation from a plausible one is the <em>rate</em>.</p>
 
-      <!-- ===== HERO CHART: the Crank-Nicolson story ===== -->
-      <h2>Crank-Nicolson does not deliver its second order</h2>
+  <p>A scheme with the drift term mis-signed often prices close too, if you only ever run it at one grid size. So nothing here is checked at one grid size. Every method is refined across a range of resolutions, and the observed order is fitted as the slope of <code>log₂(error)</code> against <code>log₂(resolution)</code>. A scheme that happens to be right at one resolution will not hold the right slope across all of them.</p>
 
-      <p>This is the result the repository exists for. Crank-Nicolson is second-order accurate <strong>for smooth data</strong>, and a vanilla payoff is not smooth — it has a kink at the strike. That kink excites high-frequency modes, and Crank-Nicolson's amplification factor tends to −1 as frequency rises, so those modes are never damped. They only alternate sign.</p>
+  <p>The resolutions plotted here are exactly those the C++ test suite asserts on. Fitting an order is sensitive to which points you fit it on, so sampling a different range for the picture would put a second, disagreeing set of numbers on this page.</p>
 
-      <div class="viz" id="viz-hero"></div>
+  <h3>Crank–Nicolson does not deliver its second order</h3>
 
-      <ul class="legend" id="legend-hero"></ul>
-      <p class="axis-note">time steps (log) — error vs the closed form (log)</p>
+  <p>This is the result the repository exists for. Crank–Nicolson is second-order accurate <strong>for smooth data</strong>, and a vanilla payoff is not smooth — it has a kink at the strike. That kink excites high-frequency modes, and Crank–Nicolson's amplification factor tends to -1 as frequency rises, so those modes are never damped. They only alternate sign.</p>
 
-      <p>The middle line is Crank-Nicolson as textbooks present it. It tracks the <em>first</em>-order guide, alongside implicit Euler, rather than the second-order one — and its error is the worst of the three at every resolution tested.</p>
+  <div class="viz" id="viz-hero"></div>
+  <ul class="legend" id="legend-hero"></ul>
+  <p class="axis-note">time steps (log) — error vs the closed form (log)</p>
 
-      <div class="result">
-        <p><strong>Two fully implicit half-steps at the start recover the missing order.</strong></p>
-        <p>Implicit Euler damps those modes completely, so once they are gone the rest of the run is second order as advertised. At ten time steps that single change takes the error from 1.95&nbsp;×&nbsp;10⁻¹ to 8.09&nbsp;×&nbsp;10⁻³ — a factor of twenty-four.</p>
-      </div>
+  <p>The middle line is Crank–Nicolson as textbooks present it. It tracks the <em>first</em>-order guide, alongside implicit Euler, rather than the second-order one — and its error is the worst of the three at every resolution tested.</p>
 
-      <p>This is Rannacher start-up, and it is not a refinement. It is a correctness fix for a scheme that is otherwise quietly wrong on exactly the payoffs anyone would price with it. Both variants are kept in the test suite, so the <em>failure</em> reproduces, not only the fix:</p>
+  <div class="result">
+    <p><strong>Two fully implicit half-steps at the start recover the missing order.</strong></p>
+    <p>Implicit Euler damps those modes completely, so once they are gone the rest of the run is second order as advertised. At ten time steps that single change takes the error from 1.95 x 10^-1 to 8.09 x 10^-3 — a factor of twenty-four.</p>
+  </div>
 
-      <pre><code>FdConfig cfg;
+  <p>This is Rannacher start-up, and it is not a refinement. It is a correctness fix for a scheme that is otherwise quietly wrong on exactly the payoffs anyone would price with it. Both variants are kept in the test suite, so the <em>failure</em> reproduces, not only the fix:</p>
+
+  <pre><code>FdConfig cfg;
 cfg.scheme = FdScheme::CrankNicolson;
 cfg.rannacher_steps = 0;   // 2 by default</code></pre>
 
-      <!-- ===== OTHER SCHEMES ===== -->
-      <h2>Every other scheme, measured the same way</h2>
+  <p style="margin-top:16px;">Each method is documented in detail on its own page — choose one below, or read the full comparison table.</p>
 
-      <div class="facets" id="facets"></div>
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:28px 0 0;">
+    <a class="method-card" href="lattices.html" style="display:block;padding:16px 14px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);text-decoration:none;color:var(--ink);">
+      <span style="font-family:var(--mono);font-size:0.66rem;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);display:block;margin-bottom:6px;">Lattices</span>
+      <span style="font-size:0.9rem;font-weight:620;color:var(--ink);display:block;margin-bottom:4px;">Tree methods</span>
+      <span style="font-size:0.78rem;color:var(--ink-mid);display:block;line-height:1.45;">Binomial CRR, Jarrow-Rudd, Tian / Boyle trinomial / American exercise</span>
+    </a>
+    <a class="method-card" href="finite-differences.html" style="display:block;padding:16px 14px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);text-decoration:none;color:var(--ink);">
+      <span style="font-family:var(--mono);font-size:0.66rem;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);display:block;margin-bottom:6px;">Finite differences</span>
+      <span style="font-size:0.9rem;font-weight:620;color:var(--ink);display:block;margin-bottom:4px;">theta-family</span>
+      <span style="font-size:0.78rem;color:var(--ink-mid);display:block;line-height:1.45;">Explicit / Crank-Nicolson / Implicit / Rannacher start-up / Thomas solver</span>
+    </a>
+    <a class="method-card" href="finite-elements.html" style="display:block;padding:16px 14px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);text-decoration:none;color:var(--ink);">
+      <span style="font-family:var(--mono);font-size:0.66rem;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);display:block;margin-bottom:6px;">Finite elements</span>
+      <span style="font-size:0.9rem;font-weight:620;color:var(--ink);display:block;margin-bottom:4px;">Galerkin P1</span>
+      <span style="font-size:0.78rem;color:var(--ink-mid);display:block;line-height:1.45;">Weak form / P1 hat basis / Consistent vs lumped mass / FD equivalence</span>
+    </a>
+    <a class="method-card" href="monte-carlo.html" style="display:block;padding:16px 14px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);text-decoration:none;color:var(--ink);">
+      <span style="font-family:var(--mono);font-size:0.66rem;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);display:block;margin-bottom:6px;">Monte Carlo</span>
+      <span style="font-size:0.9rem;font-weight:620;color:var(--ink);display:block;margin-bottom:4px;">Simulation</span>
+      <span style="font-size:0.78rem;color:var(--ink-mid);display:block;line-height:1.45;">Exact / Euler / Milstein / Antithetic / Control variate / 95% interval</span>
+    </a>
+  </div>
 
-      <!-- ===== ORDERS TABLE ===== -->
-      <div class="table-wrap">
-        <table class="orders">
-          <thead>
-            <tr>
-              <th scope="col">Method</th>
-              <th scope="col">Observed</th>
-              <th scope="col">Expected</th>
-              <th scope="col">Status</th>
-            </tr>
-          </thead>
-          <tbody id="orders-body"></tbody>
-        </table>
-      </div>
+  <h3>Every method, measured the same way</h3>
 
-      <!-- ===== DETAIL TABLE ===== -->
-      <details class="data">
-        <summary>Every plotted value, and the fitted order for each series</summary>
-        <div id="detail-table-wrap"></div>
-      </details>
+  <div class="table-wrap" style="overflow:auto;">
+    <table class="orders">
+      <thead>
+        <tr>
+          <th scope="col">Method</th>
+          <th scope="col">Observed</th>
+          <th scope="col">Expected</th>
+          <th scope="col">Status</th>
+        </tr>
+      </thead>
+      <tbody id="orders-body"></tbody>
+    </table>
+  </div>
 
-      <!-- ===== WHAT IS IMPLEMENTED ===== -->
-      <h2>What is implemented</h2>
+  <details class="data">
+    <summary>Every plotted value, and the fitted order for each series</summary>
+    <div id="detail-table-wrap"></div>
+  </details>
 
-      <ul class="impl-list">
-        <li>
-          <strong>Lattices.</strong>
-          <p>Binomial in three parameterisations — Cox-Ross-Rubinstein, Jarrow-Rudd, Tian — and the Boyle trinomial. American exercise by taking the payoff maximum at every node. The tree refuses to price when the time step drives the risk-neutral probability outside [0,&nbsp;1], rather than returning an arbitrageable number.</p>
-        </li>
-        <li>
-          <strong>Finite differences.</strong>
-          <p>The whole θ-family: explicit, Crank-Nicolson, implicit, with Rannacher start-up. Tridiagonal solves by the Thomas algorithm. The explicit scheme reports its own stability ratio, which must not exceed ½ — so an unstable configuration announces itself instead of being discovered from a price that has exploded.</p>
-        </li>
-        <li>
-          <strong>Finite elements.</strong>
-          <p>Galerkin with P1 hat functions, both consistent and lumped mass matrices, on the same θ time-stepping. Lumping the mass matrix reproduces the finite-difference scheme to 2&nbsp;×&nbsp;10⁻⁶ — an equivalence the test suite demonstrates rather than mentions.</p>
-        </li>
-        <li>
-          <strong>Monte Carlo.</strong>
-          <p>Exact terminal sampling, Euler-Maruyama and Milstein, with antithetic variates and a control variate on the terminal spot, measured at 7.5× tighter standard error for the same path count. Every result carries a standard error and a 95% interval.</p>
-        </li>
-      </ul>
+  <h3>What is implemented</h3>
+  <div class="section-rule"></div>
 
-      <!-- ===== THREE DECISIONS ===== -->
-      <h2>Three decisions worth the words</h2>
+  <ul class="impl-list">
+    <li>
+      <strong>Lattices.</strong>
+      <p>Binomial in three parameterisations — Cox-Ross-Rubinstein, Jarrow-Rudd, Tian — and the Boyle trinomial. American exercise by taking the payoff maximum at every node. The tree refuses to price when the time step drives the risk-neutral probability outside [0, 1], rather than returning an arbitrageable number.</p>
+    </li>
+    <li>
+      <strong>Finite differences.</strong>
+      <p>The whole theta-family: explicit, Crank-Nicolson, implicit, with Rannacher start-up. Tridiagonal solves by the Thomas algorithm. The explicit scheme reports its own stability ratio, which must not exceed 1/2 — so an unstable configuration announces itself instead of being discovered from a price that has exploded.</p>
+    </li>
+    <li>
+      <strong>Finite elements.</strong>
+      <p>Galerkin with P1 hat functions, both consistent and lumped mass matrices, on the same theta time-stepping. Lumping the mass matrix reproduces the finite-difference scheme to 2 x 10^-6 — an equivalence the test suite demonstrates rather than mentions.</p>
+    </li>
+    <li>
+      <strong>Monte Carlo.</strong>
+      <p>Exact terminal sampling, Euler-Maruyama and Milstein, with antithetic variates and a control variate on the terminal spot, measured at 7.5x tighter standard error for the same path count. Every result carries a standard error and a 95% interval.</p>
+    </li>
+  </ul>
 
-      <p><strong>Everything is solved in log-spot.</strong> In <code>S</code> the PDE coefficients carry <code>S</code> and <code>S²</code>, so truncation error varies across the grid and the matrix must be rebuilt as the grid changes. Substituting <code>x&nbsp;=&nbsp;ln&nbsp;S</code> makes every coefficient constant: one tridiagonal matrix serves every time step, and the scheme is uniformly accurate.</p>
+  <h3>Three decisions worth the words</h3>
+  <div class="section-rule"></div>
 
-      <p><strong>Monte Carlo refuses American exercise.</strong> Forward simulation cannot value an optimal stopping problem — that needs Longstaff-Schwartz regression. It throws rather than returning a number that looks like a price.</p>
+  <p><strong>Everything is solved in log-spot.</strong> In S the PDE coefficients carry S and S^2, so truncation error varies across the grid and the matrix must be rebuilt as the grid changes. Substituting x = ln S makes every coefficient constant: one tridiagonal matrix serves every time step, and the scheme is uniformly accurate.</p>
 
-      <p><strong>American finite differences use explicit projection</strong>, not a full linear-complementarity solve, so they are first order in time near the free boundary even under Crank-Nicolson. Stated because it is a real limitation, not omitted because it is inconvenient.</p>
+  <p><strong>Monte Carlo refuses American exercise.</strong> Forward simulation cannot value an optimal stopping problem — that needs Longstaff-Schwartz regression. It throws rather than returning a number that looks like a price.</p>
 
-      <!-- ===== RUNNING IT ===== -->
-      <h2>Running it</h2>
+  <p><strong>American finite differences use explicit projection</strong>, not a full linear-complementarity solve, so they are first order in time near the free boundary even under Crank-Nicolson. Stated because it is a real limitation, not omitted because it is inconvenient.</p>
 
-      <pre><code>cmake -B build -DCMAKE_BUILD_TYPE=Release &amp;&amp; cmake --build build
+  <h3>Running it</h3>
+  <div class="section-rule"></div>
+
+  <pre><code>cmake -B build -DCMAKE_BUILD_TYPE=Release && cmake --build build
 ./build/convergence_tests      # 18 checks
 ./build/convergence_demo       # prices one contract every way, with errors</code></pre>
 
-      <p>Header-only, no dependency beyond a C++20 compiler. Without CMake, <code>build.sh</code> and <code>build.bat</code> do the same job. Every figure and every point on this page is emitted by <code>tools/convergence_study.cpp</code> into <a href="convergence.csv">convergence.csv</a> and plotted from that file, so nothing shown here is a number typed in by hand.</p>
+  <p>Header-only, no dependency beyond a C++20 compiler. Without CMake, <code>build.sh</code> and <code>build.bat</code> do the same job. Every figure and every point on this page is emitted by <code>tools/convergence_study.cpp</code> into <a href="convergence.csv">convergence.csv</a> and plotted from that file, so nothing shown here is a number typed in by hand.</p>
 
-      <p><a href="https://github.com/omarja12/convergence-lab">Source on GitHub →</a></p>
+  <div style="display:flex;flex-wrap:wrap;gap:12px;margin-top:20px;">
+    <a href="https://github.com/omarja12/convergence-lab" style="color:var(--accent);text-decoration:none;font-weight:530;">Source on GitHub -></a>
+    <span style="color:var(--ink-mid);font-size:0.84rem;">/</span>
+    <a href="lattices.html" style="color:var(--accent);text-decoration:none;font-weight:530;">Lattices</a>
+    <a href="finite-differences.html" style="color:var(--accent);text-decoration:none;font-weight:530;">Finite differences</a>
+    <a href="finite-elements.html" style="color:var(--accent);text-decoration:none;font-weight:530;">Finite elements</a>
+    <a href="monte-carlo.html" style="color:var(--accent);text-decoration:none;font-weight:530;">Monte Carlo</a>
+  </div>
 
-      <a class="back-link" href="https://omarja12.github.io/">
-        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M11 3L5 8l6 5"/></svg>
-        ← All work
-      </a>
+  <a class="back-link" href="https://omarja12.github.io/">
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M11 3L5 8l6 5"/></svg>
+    <- All work
+  </a>
 
-    </article>
+  <footer>
+    <span style="color:var(--ink-mid);font-size:0.84rem;">convergence-lab</span>
+    <span style="color:var(--border-strong);margin:0 6px;">/</span>
+    <a href="mailto:jarir.omar@hotmail.fr" style="color:var(--ink-mid);text-decoration:none;font-size:0.84rem;">jarir.omar@hotmail.fr</a>
+    <span style="color:var(--border-strong);margin:0 6px;">/</span>
+    <a href="https://github.com/omarja12" style="color:var(--ink-mid);text-decoration:none;font-size:0.84rem;">GitHub</a>
+    <span style="color:var(--border-strong);margin:0 6px;">/</span>
+    <a href="https://github.com/omarja12/convergence-lab" style="color:var(--accent);text-decoration:none;font-size:0.84rem;">convergence-lab on GitHub</a>
+  </footer>
 
-    <footer class="site-foot">
-      <span>Omar Jarir</span>
-      <a href="mailto:jarir.omar@hotmail.fr">jarir.omar@hotmail.fr</a>
-      <a href="https://github.com/omarja12">GitHub</a>
-    </footer>
-
-  </main>
+</main>
 
 </div>
 
 <script>
-/* =================================================================
-   convergence-lab — charts rendered from convergence.csv
-   Nothing on this page is a number typed in by hand.
-   ================================================================= */
-
 (function () {
   "use strict";
 
-  /* ---- data ---- */
   var csvPath = "convergence.csv";
-  var loaded = false;
   var seriesMap = {};
 
   var seriesColor = {
-    "Binomial CRR": "#2a78d6",
-    "Implicit Euler": "#2a78d6",
-    "Crank-Nicolson (no start-up)": "#c4521e",
-    "Crank-Nicolson + Rannacher": "#1baf7a",
-    "Finite difference (space)": "#2a78d6",
-    "P1 finite elements": "#c4521e",
-    "Monte Carlo std. error": "#8a6a9e"
+    "Binomial CRR": "#3987e5",
+    "Implicit Euler": "#3987e5",
+    "Crank-Nicolson (no start-up)": "#d95926",
+    "Crank-Nicolson + Rannacher": "#199e70",
+    "Finite difference (space)": "#3987e5",
+    "P1 finite elements": "#d95926",
+    "Monte Carlo std. error": "#a088b8"
   };
 
   var expected = {
@@ -638,16 +252,6 @@ cfg.rannacher_steps = 0;   // 2 by default</code></pre>
     "Monte Carlo std. error": 0.5
   };
 
-  var shortName = {
-    "Binomial CRR": "Binomial CRR",
-    "Implicit Euler": "Implicit Euler",
-    "Crank-Nicolson (no start-up)": "Crank-Nicolson<br>(no start-up)",
-    "Crank-Nicolson + Rannacher": "Crank-Nicolson<br>+ Rannacher",
-    "Finite difference (space)": "Finite difference<br>(space)",
-    "P1 finite elements": "P1 finite<br>elements",
-    "Monte Carlo std. error": "Monte Carlo<br>std. error"
-  };
-
   var displayOrder = [
     "Binomial CRR",
     "Implicit Euler",
@@ -658,7 +262,6 @@ cfg.rannacher_steps = 0;   // 2 by default</code></pre>
     "Monte Carlo std. error"
   ];
 
-  /* ---- helpers ---- */
   function log2(x) { return Math.log(x) / Math.LN2; }
   function log10(x) { return Math.log(x) / Math.LN10; }
 
@@ -684,11 +287,10 @@ cfg.rannacher_steps = 0;   // 2 by default</code></pre>
   }
 
   function fmtOrd(v) {
-    if (v === null) return "—";
+    if (v === null) return "-";
     return v.toFixed(3);
   }
 
-  /* ---- CSV parsing ---- */
   function parseCSV(text) {
     var lines = text.replace(/^\uFEFF/, "").split(/\r?\n/);
     var out = [];
@@ -714,8 +316,7 @@ cfg.rannacher_steps = 0;   // 2 by default</code></pre>
     }
   }
 
-  /* ---- SVG chart builder ---- */
-  function buildChart(container, titleId, seriesList, xMin, xMax, yMin, yMax, guides, xLabel) {
+  function buildChart(container, titleId, seriesList, xMin, xMax, yMin, yMax, guides) {
     var W = 900, H = 440;
     var pad = { l: 54, r: 22, t: 18, b: 42 };
     var pw = W - pad.l - pad.r;
@@ -729,7 +330,6 @@ cfg.rannacher_steps = 0;   // 2 by default</code></pre>
 
     var parts = [];
 
-    // horizontal grid
     var yStart = Math.ceil(yMin / 10) * 10;
     for (var y = yStart; y <= yMax; y *= 10) {
       if (y < yMin || y > yMax) continue;
@@ -740,7 +340,6 @@ cfg.rannacher_steps = 0;   // 2 by default</code></pre>
                  '" text-anchor="end">10<tspan class="exp" dy="-4">' + exponentSuffix(y) + '</tspan></text>');
     }
 
-    // vertical ticks
     var xStep = niceStep(xMin, xMax);
     for (var x = Math.ceil(xMin / xStep) * xStep; x <= xMax; x += xStep) {
       if (x < xMin || x > xMax) continue;
@@ -751,16 +350,13 @@ cfg.rannacher_steps = 0;   // 2 by default</code></pre>
                  '" text-anchor="middle">' + x + '</text>');
     }
 
-    // guide lines
     if (guides) {
       for (var g = 0; g < guides.length; g++) {
         var go = guides[g];
-        // pick a line with slope -go in log-log that fits nicely
         var x0 = lxMin + 0.03;
         var x1 = lxMax - 0.03;
         var y0 = lyMax - 0.35;
         var y1 = y0 - go * (x1 - x0);
-        // shift whole line down so it sits inside plot
         var shift = (lyMax - y1) * 0.85;
         var ay0 = y0 + shift;
         var ay1 = y1 + shift;
@@ -775,7 +371,6 @@ cfg.rannacher_steps = 0;   // 2 by default</code></pre>
       }
     }
 
-    // series
     for (var s = 0; s < seriesList.length; s++) {
       var name = seriesList[s];
       var pts = seriesMap[name] || [];
@@ -793,9 +388,8 @@ cfg.rannacher_steps = 0;   // 2 by default</code></pre>
         var px = xPx(log10(sorted[i].resolution));
         var py = yPx(log10(sorted[i].error));
         parts.push('<circle class="dot" style="fill:' + color + '" cx="' + px.toFixed(1) +
-                   '" cy="' + py.toFixed(1) + '" r="4">' +
-                   '<title>' + name + ' — resolution ' + sorted[i].resolution + ', error ' + fmtExp(sorted[i].error) + '</title>' +
-                   '</circle>');
+                   '" cy="' + py.toFixed(1) + '" r="4"><title>' + name +
+                   ' - resolution ' + sorted[i].resolution + ', error ' + fmtExp(sorted[i].error) + '</title></circle>');
       }
     }
 
@@ -838,92 +432,6 @@ cfg.rannacher_steps = 0;   // 2 by default</code></pre>
     return out.join("");
   }
 
-  /* ---- FACET CHARTS (smaller, for the 3-panel section) ---- */
-  function buildFacetChart(container, titleId, seriesList, xMin, xMax, yMin, yMax, guides) {
-    var W = 340, H = 240;
-    var pad = { l: 44, r: 14, t: 14, b: 34 };
-    var pw = W - pad.l - pad.r;
-    var ph = H - pad.t - pad.b;
-
-    var lxMin = log10(xMin), lxMax = log10(xMax);
-    var lyMin = log10(yMin), lyMax = log10(yMax);
-
-    function xPx(lx) { return pad.l + (lx - lxMin) / (lxMax - lxMin) * pw; }
-    function yPx(ly) { return pad.t + (lyMax - ly) / (lyMax - lyMin) * ph; }
-
-    var parts = [];
-
-    // grid
-    var yStart = Math.ceil(yMin);
-    for (var y = yStart; y <= yMax; y *= 10) {
-      if (y < yMin || y > yMax) continue;
-      var ly = log10(y);
-      parts.push('<line class="grid" x1="' + pad.l + '" y1="' + yPx(ly).toFixed(1) +
-                 '" x2="' + (W - pad.r) + '" y2="' + yPx(ly).toFixed(1) + '"/>');
-      parts.push('<text class="tick" x="' + (pad.l - 6) + '" y="' + (yPx(ly) + 3.5).toFixed(1) +
-                 '" text-anchor="end">10<tspan class="exp" dy="-4">' + exponentSuffix(y) + '</tspan></text>');
-    }
-
-    var xStep = niceStep(xMin, xMax);
-    for (var x = Math.ceil(xMin / xStep) * xStep; x <= xMax; x += xStep) {
-      if (x < xMin || x > xMax) continue;
-      var lx = log10(x);
-      parts.push('<line class="grid" x1="' + xPx(lx).toFixed(1) + '" y1="' + pad.t +
-                 '" x2="' + xPx(lx).toFixed(1) + '" y2="' + (H - pad.b) + '"/>');
-      parts.push('<text class="tick" x="' + xPx(lx).toFixed(1) + '" y="' + (H - pad.b + 16) +
-                 '" text-anchor="middle">' + x + '</text>');
-    }
-
-    // guides
-    if (guides) {
-      for (var g = 0; g < guides.length; g++) {
-        var go = guides[g];
-        var x0 = lxMin + 0.04;
-        var x1 = lxMax - 0.04;
-        var y0 = lyMax - 0.3;
-        var y1 = y0 - go * (x1 - x0);
-        var shift = (lyMax - y1) * 0.82;
-        var ay0 = y0 + shift;
-        var ay1 = y1 + shift;
-        if (ay0 >= lyMin + 0.04 && ay1 <= lyMax - 0.04) {
-          parts.push('<line class="guide" x1="' + xPx(x0).toFixed(1) + '" y1="' + yPx(ay0).toFixed(1) +
-                     '" x2="' + xPx(x1).toFixed(1) + '" y2="' + yPx(ay1).toFixed(1) + '"/>');
-          parts.push('<text class="guide-label" x="' + xPx((x0+x1)/2).toFixed(1) + '" y="' +
-                     (yPx((ay0+ay1)/2) - 5).toFixed(1) + '" text-anchor="middle">order ' + go + '</text>');
-        }
-      }
-    }
-
-    // series
-    for (var s = 0; s < seriesList.length; s++) {
-      var name = seriesList[s];
-      var pts = seriesMap[name] || [];
-      if (pts.length < 2) continue;
-      var sorted = pts.slice().sort(function (a, b) { return a.resolution - b.resolution; });
-      var color = seriesColor[name] || "#888";
-      var d = "";
-      for (var i = 0; i < sorted.length; i++) {
-        var px = xPx(log10(sorted[i].resolution));
-        var py = yPx(log10(sorted[i].error));
-        d += (i === 0 ? "M" : "L") + px.toFixed(1) + " " + py.toFixed(1) + " ";
-      }
-      parts.push('<path class="line" style="stroke:' + color + '" d="' + d + '"/>');
-      for (var i = 0; i < sorted.length; i++) {
-        var px = xPx(log10(sorted[i].resolution));
-        var py = yPx(log10(sorted[i].error));
-        parts.push('<circle class="dot" style="fill:' + color + '" cx="' + px.toFixed(1) +
-                   '" cy="' + py.toFixed(1) + '" r="3.5">' +
-                   '<title>' + name + ' — resolution ' + sorted[i].resolution + ', error ' + fmtExp(sorted[i].error) + '</title>' +
-                   '</circle>');
-      }
-    }
-
-    var svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-labelledby="' + titleId +
-              '" preserveAspectRatio="xMidYMid meet">' + parts.join("") + '</svg>';
-    container.innerHTML = svg;
-  }
-
-  /* ---- render hero chart ---- */
   function renderHero() {
     var seriesList = [
       "Implicit Euler",
@@ -944,7 +452,6 @@ cfg.rannacher_steps = 0;   // 2 by default</code></pre>
       if (pts[i].error > yMax) yMax = pts[i].error;
     }
 
-    // pad
     xMin = xMin * 0.8;
     xMax = xMax * 1.2;
     yMin = Math.min(yMin * 0.7, 1e-5);
@@ -956,76 +463,6 @@ cfg.rannacher_steps = 0;   // 2 by default</code></pre>
     document.getElementById("legend-hero").innerHTML = legendHTML(seriesList);
   }
 
-  /* ---- render facets ---- */
-  function renderFacets() {
-    var facets = [
-      {
-        id: "space",
-        title: "Space discretisation",
-        note: "refined with Δt ∝ Δx², so the time term cannot mask the spatial order",
-        series: ["Finite difference (space)", "P1 finite elements"],
-        guides: [2]
-      },
-      {
-        id: "lattice",
-        title: "Lattice",
-        note: "S=K puts the strike on a node, exposing the rate without oscillation",
-        series: ["Binomial CRR"],
-        guides: [1]
-      },
-      {
-        id: "mc",
-        title: "Monte Carlo",
-        note: "standard error, which is the honest measure — a single realised error is a draw",
-        series: ["Monte Carlo std. error"],
-        guides: [0.5]
-      }
-    ];
-
-    var frag = document.createDocumentFragment();
-
-    for (var f = 0; f < facets.length; f++) {
-      var fac = facets[f];
-      var pts = [];
-      for (var s = 0; s < fac.series.length; s++) {
-        var sp = seriesMap[fac.series[s]] || [];
-        for (var j = 0; j < sp.length; j++) pts.push(sp[j]);
-      }
-      if (pts.length === 0) continue;
-
-      var xMin = Infinity, xMax = -Infinity, yMin = Infinity, yMax = -Infinity;
-      for (var i = 0; i < pts.length; i++) {
-        if (pts[i].resolution < xMin) xMin = pts[i].resolution;
-        if (pts[i].resolution > xMax) xMax = pts[i].resolution;
-        if (pts[i].error < yMin) yMin = pts[i].error;
-        if (pts[i].error > yMax) yMax = pts[i].error;
-      }
-
-      xMin = xMin * 0.8;
-      xMax = xMax * 1.2;
-      yMin = Math.max(yMin * 0.5, 1e-8);
-      yMax = yMax * 1.8;
-
-      var div = document.createElement("div");
-      div.className = "facet";
-      div.innerHTML = '<h3 id="' + fac.id + '-title">' + fac.title + '</h3>' +
-                      '<p>' + fac.note + '</p>' +
-                      '<div class="viz" id="' + fac.id + '-viz"></div>' +
-                      '<ul class="legend" id="' + fac.id + '-legend"></ul>';
-      frag.appendChild(div);
-
-      var vizEl = div.querySelector("#" + fac.id + "-viz");
-      var legendEl = div.querySelector("#" + fac.id + "-legend");
-      if (vizEl && legendEl) {
-        buildFacetChart(vizEl, fac.id + "-title", fac.series, xMin, xMax, yMin, yMax, fac.guides);
-        legendEl.innerHTML = legendHTML(fac.series);
-      }
-    }
-
-    document.getElementById("facets").appendChild(frag);
-  }
-
-  /* ---- orders table ---- */
   function renderOrders() {
     var tbody = document.getElementById("orders-body");
     if (!tbody) return;
@@ -1040,13 +477,12 @@ cfg.rannacher_steps = 0;   // 2 by default</code></pre>
                        (o !== null && o < e) ? "below theory" : "above theory";
       rows.push('<tr><th scope="row">' + name.replace(/<br>/g, " ") + '</th>' +
                 '<td class="num">' + fmtOrd(o) + '</td>' +
-                '<td class="num">' + (e !== null ? e : "—") + '</td>' +
+                '<td class="num">' + (e !== null ? e : "-") + '</td>' +
                 '<td class="' + cls + '">' + statusText + '</td></tr>');
     }
     tbody.innerHTML = rows.join("");
   }
 
-  /* ---- detail table ---- */
   function renderDetail() {
     var wrap = document.getElementById("detail-table-wrap");
     if (!wrap) return;
@@ -1077,28 +513,19 @@ cfg.rannacher_steps = 0;   // 2 by default</code></pre>
     wrap.innerHTML = parts.join("");
   }
 
-  /* ---- init ---- */
   function init() {
-    var useFallback = false;
-
     fetch(csvPath).then(function (r) {
-      if (!r.ok) { useFallback = true; return null; }
+      if (!r.ok) return null;
       return r.text();
     }).then(function (text) {
       if (text !== null) {
         var data = parseCSV(text);
         buildSeriesMap(data);
       }
-      loaded = true;
       renderHero();
-      renderFacets();
       renderOrders();
       renderDetail();
     }).catch(function () {
-      useFallback = true;
-      loaded = true;
-
-      // Static fallback values from convergence.csv (embedded so page works offline / file://)
       seriesMap["Implicit Euler"] = [
         { resolution: 10, error: 1.043058754865e-1 },
         { resolution: 20, error: 5.233600863510e-2 },
@@ -1141,7 +568,6 @@ cfg.rannacher_steps = 0;   // 2 by default</code></pre>
       ];
 
       renderHero();
-      renderFacets();
       renderOrders();
       renderDetail();
     });
