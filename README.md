@@ -1,5 +1,11 @@
 # convergence-lab
 
+[![C++20](https://img.shields.io/badge/C%2B%2B-20-00599C?logo=c%2B%2B&logoColor=white)](https://en.cppreference.com/w/cpp/20)
+[![header-only](https://img.shields.io/badge/header--only-yes-success)](include/convergence)
+[![dependencies](https://img.shields.io/badge/dependencies-none-success)](#dependencies)
+[![tests](https://img.shields.io/badge/checks-18%2F18-brightgreen)](tests/test_convergence.cpp)
+[![licence](https://img.shields.io/badge/licence-MIT-blue)](LICENSE)
+
 The Black–Scholes PDE solved four ways in C++20 — lattices, finite differences,
 finite elements and Monte Carlo — with every scheme measured against the closed
 form, and **every convergence rate verified rather than asserted**.
@@ -14,6 +20,12 @@ $ ./build/convergence_tests
 ...
 18/18 checks passed
 ```
+
+**Contents** · [Why rates](#why-convergence-rates-not-prices) ·
+[The Crank–Nicolson trap](#the-cranknicolson-trap) · [Quickstart](#quickstart) ·
+[Dependencies](#dependencies) · [What is implemented](#what-is-implemented) ·
+[Design notes](#design-notes-worth-the-words) · [Layout](#layout) ·
+[References](#references)
 
 ---
 
@@ -104,6 +116,56 @@ auto r = finite_difference(opt, mkt, cfg);
 
 ---
 
+## Dependencies
+
+**None.** No Boost, no Eigen, no QuantLib, no test framework, no package
+manager. A C++20 compiler and its standard library are the whole toolchain,
+which is why `build.sh` is four lines and the library is five headers you can
+drop into a project.
+
+That is a deliberate choice, not an omission. A linear algebra library would
+hide the Thomas algorithm behind a solver call, and the point here is that the
+tridiagonal solve, the θ-weighting and the Rannacher start-up are visible and
+auditable. Everything below is cited in full:
+
+### C++ standard library
+
+| Header | Used for | Where |
+|---|---|---|
+| [`<vector>`](https://en.cppreference.com/w/cpp/container/vector) | `std::vector<double>` for the log-spot grid, tridiagonal bands, lattice layers and path buffers — the only container in the project | all four method headers |
+| [`<cmath>`](https://en.cppreference.com/w/cpp/header/cmath) | `std::exp`, `std::log`, `std::sqrt`, `std::pow` for the SDE and lattice parameterisations; `std::erfc` for the normal CDF (rather than `0.5*(1+erf(x/√2))`, for accuracy in the far tail); `std::fmax` for payoffs and American projection; `std::log2` for the observed-order slopes | `option.hpp`, `monte_carlo.hpp`, tests |
+| [`<random>`](https://en.cppreference.com/w/cpp/header/random) | `std::mt19937_64` seeded explicitly for reproducible runs, `std::normal_distribution<double>` for the Gaussian increments | `monte_carlo.hpp` |
+| [`<algorithm>`](https://en.cppreference.com/w/cpp/header/algorithm) | `std::lower_bound` + `std::distance` to locate spot in the grid for interpolation; `std::min`/`std::max` to clamp the Rannacher step count and the pilot-run size | `finite_difference.hpp`, `finite_element.hpp`, `monte_carlo.hpp` |
+| [`<stdexcept>`](https://en.cppreference.com/w/cpp/header/stdexcept) | `std::invalid_argument` and `std::runtime_error` — the tree throwing on a risk-neutral probability outside [0,1], and Monte Carlo refusing American exercise, both go through here | all method headers |
+| [`<cstdint>`](https://en.cppreference.com/w/cpp/header/cstdint) | `std::int64_t` path counts and `std::uint64_t` seeds, sized rather than implementation-defined | `monte_carlo.hpp` |
+| [`<cstdio>`](https://en.cppreference.com/w/cpp/header/cstdio) | `std::printf`/`std::snprintf` for the comparison table and the CSV the project page is plotted from | `src/`, `tests/`, `tools/` only |
+| [`<string>`](https://en.cppreference.com/w/cpp/header/string) | `std::string`, `std::to_string` in test and demo labels | `src/`, `tests/`, `tools/` only |
+
+The five library headers pull in the first six rows only; `<cstdio>` and
+`<string>` never reach the library itself.
+
+### Language features
+
+C++20 is the standard, though the library stays conservative within it:
+`[[nodiscard]]` on every result-returning function, `inline constexpr`
+constants, `noexcept` where it holds, aggregate initialisation for the `Option`,
+`Market` and config structs, and designated-initialiser-friendly defaults so
+`FdConfig cfg;` is already a sensible scheme.
+
+### Build and test
+
+| Tool | Role | Required? |
+|---|---|---|
+| Any C++20 compiler (g++ 10+, clang++ 12+, MSVC 19.29+) | the entire toolchain | yes |
+| [CMake](https://cmake.org/) ≥ 3.16 | `INTERFACE` target, warnings, CTest registration | no — `build.sh` / `build.bat` do the same job |
+| CTest | `ctest` runs the same 18 checks | no |
+
+Tests are hand-rolled: `tests/test_convergence.cpp` counts its own assertions
+and prints `18/18 checks passed`. No GoogleTest, no Catch2, nothing to install
+before you can verify the claims in the table above.
+
+---
+
 ## What is implemented
 
 **Lattices** — `include/convergence/lattice.hpp`
@@ -163,7 +225,9 @@ include/convergence/finite_difference.hpp  theta-family, Thomas solver, Rannache
 include/convergence/finite_element.hpp     Galerkin P1, consistent and lumped mass
 include/convergence/monte_carlo.hpp        exact / Euler / Milstein, variance reduction
 src/main.cpp                               comparison table
+tools/convergence_study.cpp                emits docs/convergence.csv
 tests/test_convergence.cpp                 18 checks, orders and edge cases
+docs/                                      project page, plotted from convergence.csv
 ```
 
 ## References
@@ -176,4 +240,16 @@ tests/test_convergence.cpp                 18 checks, orders and edge cases
 
 ## Licence
 
-MIT.
+MIT. See [LICENSE](LICENSE).
+
+---
+
+<sub>**Keywords:** quantitative finance · computational finance · Black–Scholes ·
+option pricing · derivatives pricing · numerical methods · numerical analysis ·
+convergence analysis · order of accuracy · finite difference method ·
+Crank–Nicolson · Rannacher time-marching · theta scheme · Thomas algorithm ·
+finite element method · Galerkin P1 · mass lumping · binomial tree ·
+Cox–Ross–Rubinstein · Jarrow–Rudd · Tian · trinomial tree · Boyle ·
+Monte Carlo simulation · Euler–Maruyama · Milstein scheme · antithetic variates ·
+control variate · variance reduction · PDE solver · American options ·
+header-only · C++20</sub>
