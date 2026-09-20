@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Monte Carlo — convergence-lab</title>
+<meta name="description" content="Monte Carlo pricing of the Black-Scholes contract: exact terminal sampling, Euler-Maruyama, Milstein, antithetic variates, control variates, and why every result carries a standard error.">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="reference.css">
+</head>
+<body>
+
+<div class="wrap">
+
+<header class="site-head">
+  <a class="brand" href="index.html">
+    <span class="repo-word">convergence-lab</span>
+    <span class="repo-name">/</span>
+    <span class="repo-name">methods</span>
+  </a>
+  <span style="font-family:var(--mono);font-size:0.7rem;color:var(--ink-soft)">C++20 · MIT</span>
+</header>
+
+<div class="page-head">
+  <p class="crumb">Method reference · Monte Carlo</p>
+  <h1>Simulation pricing with variance reduction</h1>
+  <p class="lead">Price the contract by simulating the terminal spot under the
+  risk-neutral measure and averaging the discounted payoff. Three ways of getting
+  to the terminal spot — exact, Euler–Maruyama, Milstein — and two variance
+  reduction techniques that tighten the standard error by a factor of around
+  seven and a half at the same path count. Every result carries a standard error
+  and a 95% interval, because a Monte Carlo price quoted without one is not a
+  result, it is a number.</p>
+</div>
+
+<nav class="method-nav" aria-label="Method pages">
+  <a href="lattices.html">Lattices</a>
+  <span class="sep">·</span>
+  <a href="finite-differences.html">Finite differences</a>
+  <span class="sep">·</span>
+  <a href="finite-elements.html">Finite elements</a>
+  <span class="sep">·</span>
+  <a href="index.html" style="color:var(--ink-soft)">← Index</a>
+</nav>
+
+<div class="two-col">
+
+<aside class="sidebar">
+  <h3>On this page</h3>
+  <ul class="toc">
+    <li><a href="#overview" class="current">Overview</a></li>
+    <li><a href="#terminal">Getting to the terminal spot</a></li>
+    <li><a href="#exact">Exact sampling</a></li>
+    <li><a href="#euler">Euler–Maruyama</a></li>
+    <li><a href="#milstein">Milstein</a></li>
+    <li><a href="#variance">Variance reduction</a></li>
+    <li><a href="#control">Control variate</a></li>
+    <li><a href="#interval">Standard error and interval</a></li>
+    <li><a href="#american">American exercise</a></li>
+    <li><a href="#source">Source</a></li>
+  </ul>
+</aside>
+
+<article class="article">
+
+<section id="overview">
+<h2>Overview</h2>
+
+<p>Monte Carlo prices by the law of large numbers. Simulate the terminal spot
+<code>S_T</code> under the risk-neutral measure many times, take the payoff at
+each path, discount, and average. The price is unbiased for any finite number of
+paths; what improves with more paths is the precision, measured by the standard
+error, which falls as <code>1/√N</code>.</p>
+
+<div class="formula"><code>
+price = e^{-rT} · (1/N) Σ payoff(S_T^{(i)})
+standard error ∝ 1/√N
+</code></div>
+
+<p>The implementation is built around three questions a reader should be able to
+answer from the code: how do you get to the terminal spot, how do you reduce the
+variance, and how do you know the number you printed is anywhere near the truth?</p>
+
+<table class="ref">
+  <thead><tr><th>Question</th><th>Answer in the code</th></tr></thead>
+  <tbody>
+    <tr><td>How do you get to S_T?</td><td>Three schemes: exact, Euler, Milstein — chosen by <code>McScheme</code></td></tr>
+    <tr><td>How do you reduce variance?</td><td>Antithetic variates and a control variate on the terminal spot, both optional</td></tr>
+    <tr><td>How do you know it's right?</td><td>Standard error and a 95% interval on every result, plus a control variate with known expectation</td></tr>
+  </tbody>
+</table>
+</section>
+
+<section id="terminal">
+<h2>Getting to the terminal spot</h2>
+
+<p>The dynamics under the risk-neutral measure are geometric Brownian motion:</p>
+
+<div class="formula"><code>
+dS = (r - q) S dt + σ S dW
+</code></div>
+
+<p>There are three ways to integrate this to maturity, and the implementation
+gives you all three so you can see what each one costs:</p>
+
+<table class="ref">
+  <thead><tr><th>Scheme</th><th>Steps needed</th><th>Discretisation error</th><th>Order</th></tr></thead>
+  <tbody>
+    <tr><td>Exact</td><td class="num">1</td><td>None — GBM is integrable</td><td class="num">—</td></tr>
+    <tr><td>Euler–Maruyama</td><td class="num">Multiple</td><td>Weak order 1</td><td class="num">1</td></tr>
+    <tr><td>Milstein</td><td class="num">Multiple</td><td>Strong order 1; smaller bias than Euler</td><td class="num">1</td></tr>
+  </tbody>
+</table>
+
+<div class="note"><strong>Euler and Milstein are not needed to price a European
+option.</strong> Exact sampling gets there in one step with no discretisation
+error at all. They are in the library because the point of a discretisation scheme
+is what it costs you, and that cost is only visible when an exact answer sits next
+to it. The test suite compares Euler at 4 steps and 64 steps against exact
+sampling, and the bias clearly shrinks with the step count.</div>
+</section>
+
+<section id="exact">
+<h2>Exact sampling</h2>
+
+<p>Geometric Brownian motion is integrable, so the terminal spot can be drawn
+directly:</p>
+
+<div class="formula"><code>
+S_T = S_0 · exp( (r - q - σ²/2) T + σ √T · Z ),   Z ~ N(0,1)
+</code></div>
+
+<p>One normal draw per path, no time-stepping, no discretisation error. Any bias
+in an exact-sampling price is pure sampling noise — the kind that the standard
+error measures. The implementation uses this as the default scheme because it is
+the one that makes the fewest assumptions.</p>
+
+<pre><code>inline double terminal_spot(McScheme scheme, double s0, double drift, double sig,
+                            double T, int steps, const std::vector&lt;double&gt;&amp; z) {
+    if (scheme == McScheme::Exact)
+        return s0 * std::exp((drift - 0.5*sig*sig)*T + sig*std::sqrt(T)*z[0]);
+    // ... Euler / Milstein below
+}</code></pre>
+</section>
+
+<section id="euler">
+<h2>Euler–Maruyama</h2>
+
+<p>The simplest discretisation of an SDE. Replace the differential with a finite
+step:</p>
+
+<div class="formula"><code>
+S_{t+Δt} = S_t + (r-q) S_t Δt + σ S_t √Δt · Z_t
+</code></div>
+
+<p>Weak order 1 — the expected value converges at <code>O(Δt)</code>. For a
+European option the bias is small at reasonable step counts, but it is there, and
+it is the kind of bias that disappears if you forget to check it. The
+implementation clamps negative spot values to zero, because Euler can step a
+positive process negative; the comment in the source notes that this clamping is a
+real source of bias, not a formality.</p>
+</section>
+
+<section id="milstein">
+<h2>Milstein</h2>
+
+<p>Adds the Stratonovich correction term to the Euler step:</p>
+
+<div class="formula"><code>
+S_{t+Δt} = S_t + (r-q) S_t Δt + σ S_t √Δt · Z_t
+           + ½ σ² S_t (Δt · Z_t² - Δt)
+</code></div>
+
+<p>Strong order 1 — the pathwise error converges at <code>O(Δt)</code>, better
+than Euler’s <code>O(√Δt)</code>. For a European option the weak-order bias is
+similar to Euler’s at the same step count, but Milstein is the correct
+generalisation when you need pathwise accuracy (e.g. for path-dependent
+contracts). The implementation includes it so the three schemes form a complete
+picture: exact (no error), Euler (small weak bias), Milstein (strong-order
+correct).</p>
+</section>
+
+<section id="variance">
+<h2>Variance reduction</h2>
+
+<p>The standard error of a plain Monte Carlo estimate is
+<code>σ_payoff / √N</code>, and <code>σ_payoff</code> for an option payoff can be
+large relative to the price. Two techniques are used here, both optional and both
+independent:</p>
+
+<table class="ref">
+  <thead><tr><th>Technique</th><th>What it does</th><th>Cost</th></tr></thead>
+  <tbody>
+    <tr><td>Antithetic variates</td><td>For each <code>Z</code>, also use <code>-Z</code>; average the two payoffs</td><td>Doubles the work per path, but the pair is negatively correlated so the variance of the pair is lower</td></tr>
+    <tr><td>Control variate</td><td>Subtract a β-weighted deviation of a correlated quantity with known expectation</td><td>A small pilot run to estimate β; then free per path</td></tr>
+  </tbody>
+</table>
+
+<p>Both are applied in the same draw function, so a path with both techniques
+produces one adjusted payoff that carries the benefit of each. The demo
+<code>main.cpp</code> reports the factor by which the standard error shrinks when
+both are turned on — around 7.5× at the same path count.</p>
+</section>
+
+<section id="control">
+<h2>Control variate</h2>
+
+<p>The control variate is the undiscounted terminal spot <code>S_T</code>. Its
+expectation under the risk-neutral measure is the forward price
+<code>S₀ · exp((r-q)T)</code>, which is known exactly. The terminal spot is highly
+correlated with the option payoff (especially for a call), so subtracting a
+β-weighted deviation of <code>S_T - forward</code> from the payoff removes much of
+the variance without biasing the result:</p>
+
+<div class="formula"><code>
+adjusted_payoff = payoff(S_T) - β · (S_T - forward)
+</code></div>
+
+<p>The β is estimated on a small pilot run and then held fixed for the main
+simulation. Estimating β on the same paths it corrects would bias the result; the
+implementation uses a separate pilot of up to <code>min(paths/10, 20000)</code>
+paths for this, so the correction stays independent of the sample it is applied to.</p>
+
+<pre><code>if (cfg.control_variate) {
+    const int64_t pilot = std::min&lt;int64_t&gt;(cfg.paths/10, 20000);
+    // ... estimate beta from pilot ...
+}
+// main loop
+sum += payoff - beta * (control - forward);</code></pre>
+
+<p>The forward used in the control is the risk-neutral expectation of the terminal
+spot:</p>
+
+<div class="formula"><code>
+forward = S_0 · exp((r - q) T)
+</code></div>
+</section>
+
+<section id="interval">
+<h2>Standard error and 95% interval</h2>
+
+<p>Every result carries a standard error, computed from the sample variance of the
+adjusted payoffs with Bessel’s correction:</p>
+
+<div class="formula"><code>
+mean = (1/N) Σ adjusted
+var  = (Σ adjusted² / N - mean²) · N / (N-1)
+standard error = disc · √(max(var, 0) / N)
+</code></div>
+
+<p>The discount factor is applied after the mean and standard error are computed,
+so they are stated in present-value terms. The 95% interval is
+<code>price ± 1.959964 · standard error</code>, and it is reported on every result
+so a claim of agreement with the analytic price can be checked rather than
+eyeballed.</p>
+
+<pre><code>struct McResult {
+    double price;
+    double standard_error;
+    int64_t paths;
+    [[nodiscard]] double ci_low()  const noexcept { return price - 1.959964 * standard_error; }
+    [[nodiscard]] double ci_high() const noexcept { return price + 1.959964 * standard_error; }
+};</code></pre>
+
+<div class="note"><strong>The interval contains the truth.</strong> The test suite
+runs 400,000 paths and checks that the 95% interval contains the analytic price.
+Not that it is close to it — that it <em>contains</em> it. A Monte Carlo price
+without an interval is a point estimate with no stated uncertainty; with an
+interval it is a statement about where the true value lives.</div>
+
+<p>The standard error falls as <code>1/√N</code>, which the test suite checks by
+measuring it at {2000, 8000, 32000, 128000} paths and fitting the observed order —
+expected 0.5, observed in the range 0.4 to 0.6.</p>
+</section>
+
+<section id="american">
+<h2>American exercise</h2>
+
+<p>Monte Carlo cannot price an American option by forward simulation alone. An
+American contract requires knowing the optimal stopping rule — the value of
+exercising now versus continuing — and forward simulation gives you the latter only
+by a regression against future paths (Longstaff–Schwartz). The implementation
+rejects American exercise outright rather than returning a number that looks like a
+price:</p>
+
+<pre><code>if (opt.exercise == Exercise::American)
+    throw std::invalid_argument(
+        "monte_carlo: American exercise needs a regression method "
+        "(Longstaff-Schwartz); forward simulation alone cannot price it");</code></pre>
+
+<div class="warn"><strong>This is the same discipline as the rest of the
+library.</strong> A scheme that cannot do something refuses rather than returns a
+plausible-looking wrong answer. The finite-difference and tree modules can price
+American contracts; Monte Carlo cannot, and says so. The test suite checks that an
+American put throws.</div>
+</section>
+
+<section id="source">
+<h2>Source</h2>
+
+<div class="fileref">
+  <p class="fref-label">Implementation</p>
+  <p class="fref-path">include/convergence/monte_carlo.hpp — exact/Euler/Milstein terminal sampling, antithetic variates, control variate, standard error, 95% interval</p>
+  <div class="fref-links">
+    <a href="https://github.com/omarja12/convergence-lab/blob/main/include/convergence/monte_carlo.hpp">View on GitHub →</a>
+  </div>
+</div>
+
+<div class="fileref" style="margin-top:12px">
+  <p class="fref-label">Demo / comparison</p>
+  <p class="fref-path">src/main.cpp — plain, antithetic+CV, and Euler prices, with standard errors and reduction factors</p>
+  <div class="fref-links">
+    <a href="https://github.com/omarja12/convergence-lab/blob/main/src/main.cpp">View on GitHub →</a>
+  </div>
+</div>
+
+<div class="fileref" style="margin-top:12px">
+  <p class="fref-label">Tests</p>
+  <p class="fref-path">tests/test_convergence.cpp — standard error order, variance reduction factor, interval coverage, Euler bias, American rejection</p>
+  <div class="fref-links">
+    <a href="https://github.com/omarja12/convergence-lab/blob/main/tests/test_convergence.cpp">View on GitHub →</a>
+  </div>
+</div>
+
+<a class="back-link" href="index.html">
+  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M11 3L5 8l6 5"/></svg>
+  ← All methods
+</a>
+
+</article>
+
+</div>
+
+<footer class="site-foot">
+  <span>convergence-lab</span>
+  <span class="sep">/</span>
+  <a href="index.html">Index</a>
+  <span class="sep">·</span>
+  <a href="https://github.com/omarja12/convergence-lab">GitHub</a>
+  <span class="sep">·</span>
+  <a href="mailto:jarir.omar@hotmail.fr">jarir.omar@hotmail.fr</a>
+</footer>
+
+</div>
+
+</body>
+</html>

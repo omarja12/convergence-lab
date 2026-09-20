@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Finite Elements — convergence-lab</title>
+<meta name="description" content="Galerkin finite elements on the log-transformed Black-Scholes PDE: P1 hat basis, consistent and lumped mass matrices, and why lumping recovers the finite-difference scheme to 2e-6.">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="reference.css">
+</head>
+<body>
+
+<div class="wrap">
+
+<header class="site-head">
+  <a class="brand" href="index.html">
+    <span class="repo-word">convergence-lab</span>
+    <span class="repo-name">/</span>
+    <span class="repo-name">methods</span>
+  </a>
+  <span style="font-family:var(--mono);font-size:0.7rem;color:var(--ink-soft)">C++20 · MIT</span>
+</header>
+
+<div class="page-head">
+  <p class="crumb">Method reference · Finite elements</p>
+  <h1>Galerkin P1 on the log-transformed PDE</h1>
+  <p class="lead">The same Black–Scholes PDE as the finite-difference module, but
+  written in weak form. Multiply by a test function and integrate the second
+  derivative by parts, expand the solution in P1 hat functions, and you get a
+  system that is tridiagonal — so it reuses the same Thomas solver. The interest
+  is in the mass matrix: consistent Galerkin couples neighbouring nodes, and
+  lumping it to its row sums recovers the finite-difference scheme to 2 × 10⁻⁶.</p>
+</div>
+
+<nav class="method-nav" aria-label="Method pages">
+  <a href="lattices.html">Lattices</a>
+  <span class="sep">·</span>
+  <a href="finite-differences.html">Finite differences</a>
+  <span class="sep">·</span>
+  <a href="monte-carlo.html">Monte Carlo</a>
+  <span class="sep">·</span>
+  <a href="index.html" style="color:var(--ink-soft)">← Index</a>
+</nav>
+
+<div class="two-col">
+
+<aside class="sidebar">
+  <h3>On this page</h3>
+  <ul class="toc">
+    <li><a href="#weak-form" class="current">The weak form</a></li>
+    <li><a href="#basis">P1 hat basis</a></li>
+    <li><a href="#matrices">Element matrices</a></li>
+    <li><a href="#mass">Mass matrix: consistent vs lumped</a></li>
+    <li><a href="#equivalence">The FD equivalence</a></li>
+    <li><a href="#time">Time-stepping</a></li>
+    <li><a href="#boundaries">Boundaries</a></li>
+    <li><a href="#source">Source</a></li>
+  </ul>
+</aside>
+
+<article class="article">
+
+<section id="weak-form">
+<h2>The weak form</h2>
+
+<p>The PDE is the same one the finite-difference module solves — in
+<code>x = ln S</code>, forward in <code>τ = T - t</code>:</p>
+
+<div class="formula"><code>
+dV/dτ = a · d²V/dx² + b · dV/dx - rV
+</code></div>
+
+<p>with <code>a = σ²/2</code> and <code>b = r - q - σ²/2</code>. The finite
+element method does not discretise this directly. It multiplies by a test
+function <code>φ</code> and integrates the second derivative by parts:</p>
+
+<div class="formula"><code>
+(dV/dτ, φ) = -a (V', φ') + b (V', φ) - r (V, φ)
+</code></div>
+
+<p>where <code>(f, g)</code> denotes the inner product over the domain. The
+second derivative is gone; what remains is first derivatives of both the
+solution and the test function, which a piecewise-linear basis can represent
+exactly.</p>
+</section>
+
+<section id="basis">
+<h2>P1 hat basis</h2>
+
+<p>The solution is expanded in P1 (piecewise-linear, continuous) hat functions.
+Each basis function is 1 at its own node, 0 at every other node, and linear in
+between — a triangular hat. On a uniform mesh of size <code>h</code> there are
+<code>n+1</code> nodes and <code>n</code> elements, and an interior row of the
+assembled system couples only the node and its two neighbours.</p>
+
+<div class="diagram">
+  <p class="diag-title">P1 hat function on a uniform mesh</p>
+  <svg viewBox="0 0 480 120" preserveAspectRatio="xMidYMid meet">
+    <!-- grid -->
+    <line x1="40" y1="100" x2="440" y2="100" stroke="#d4dce2" stroke-width="1"/>
+    <line x1="40" y1="100" x2="40" y2="20" stroke="#d4dce2" stroke-width="1"/>
+    <line x1="160" y1="100" x2="160" y2="20" stroke="#d4dce2" stroke-width="1"/>
+    <line x1="280" y1="100" x2="280" y2="20" stroke="#d4dce2" stroke-width="1"/>
+    <line x1="400" y1="100" x2="400" y2="20" stroke="#d4dce2" stroke-width="1"/>
+    <!-- nodes -->
+    <circle cx="40" cy="100" r="4" fill="#1a2332"/>
+    <circle cx="160" cy="100" r="4" fill="#1a2332"/>
+    <circle cx="280" cy="100" r="4" fill="#1a2332"/>
+    <circle cx="400" cy="100" r="4" fill="#1a2332"/>
+    <!-- hat -->
+    <polygon points="40,100 160,100 280,20 400,100" fill="none" stroke="#2563eb" stroke-width="2"/>
+    <circle cx="280" cy="20" r="4" fill="#2563eb"/>
+    <!-- label -->
+    <text x="280" y="115" text-anchor="middle" font-family="monospace" font-size="10" fill="#7a8899">φᵢ(x): 1 at node i, 0 at all others</text>
+  </svg>
+</div>
+
+<p>Writing <code>V(x) = Σ vⱼ φⱼ(x)</code> and taking each hat as a test function
+gives one equation per interior node. The system is:</p>
+
+<div class="formula"><code>
+M dV/dτ = A V      where      A = -a K + b B - r M
+</code></div>
+
+<p><code>M</code> is the mass matrix, <code>K</code> the stiffness matrix, and
+<code>B</code> the convection matrix. All three are tridiagonal, so the θ-time-
+stepping — exactly the same one as the finite-difference module — builds a
+tridiagonal system and solves it with the same Thomas algorithm.</p>
+</section>
+
+<section id="matrices">
+<h2>Element matrices</h2>
+
+<p>For a uniform mesh with element size <code>h</code>, the per-row contributions
+are:</p>
+
+<table class="ref">
+  <thead><tr><th>Matrix</th><th>Form</th><th>Row pattern</th></tr></thead>
+  <tbody>
+    <tr><td>Mass <em>M</em> (consistent)</td><td class="num">h/6 · tridiag(1, 4, 1)</td><td>off = h/6, dia = 4h/6</td></tr>
+    <tr><td>Mass <em>M</em> (lumped)</td><td class="num">h · diag(0, 1, 0)</td><td>off = 0, dia = h</td></tr>
+    <tr><td>Stiffness <em>K</em></td><td class="num">1/h · tridiag(-1, 2, -1)</td><td>off = -1/h, dia = 2/h</td></tr>
+    <tr><td>Convection <em>B</em></td><td class="num">tridiag(-½, 0, ½)</td><td>off = -½, dia = 0</td></tr>
+  </tbody>
+</table>
+
+<p>The system matrix is assembled row by row as
+<code>A_row = -a·K_row + b·B_row - r·M_row</code>. Because the mesh is uniform,
+every interior row is the same, so the lower, diagonal, and upper vectors are
+filled with constants before the time loop:</p>
+
+<pre><code>const double a_low = -a*(-1/h) + b*(-0.5) - r*m_off;
+const double a_dia = -a*( 2/h) + b*( 0.0) - r*m_dia;
+const double a_upp = -a*(-1/h) + b*( 0.5) - r*m_off;
+
+for (size_t k = 0; k < m; ++k) {
+    lower[k] = m_off - θ·dt·a_low;
+    diag[k]  = m_dia - θ·dt·a_dia;
+    upper[k] = m_off - θ·dt·a_upp;
+}</code></pre>
+
+<p>The <code>θ·dt</code> term is what puts the time-stepping into the matrix. For
+<code>θ = 0</code> (explicit) the matrix is just the mass matrix row; for
+<code>θ = 1</code> (implicit) it is the full <code>M - dt·A</code> row; for
+<code>θ = ½</code> it is the Crank–Nicolson blend.</p>
+</section>
+
+<section id="mass">
+<h2>Mass matrix: consistent vs lumped</h2>
+
+<p>The finite-difference module uses the identity mass matrix implicitly — each
+node is its own degree of freedom with no coupling to its neighbours in the time
+term. The finite-element module offers two choices:</p>
+
+<table class="ref">
+  <thead><tr><th>Choice</th><th>M row</th><th>Effect</th></tr></thead>
+  <tbody>
+    <tr><td>Consistent (Galerkin)</td><td class="num">h/6 · (1, 4, 1)</td><td>True projection onto the P1 space; couples neighbours in the time term</td></tr>
+    <tr><td>Lumped</td><td class="num">h · (0, 1, 0)</td><td>Row-summed to diagonal; diagonal mass, closer to the FD scheme</td></tr>
+  </tbody>
+</table>
+
+<p>The consistent mass matrix is the correct one for a Galerkin method — it is
+the <code>L²</code> projection of the solution onto the hat basis. The lumped
+mass is a common approximation that is cheaper (diagonal, no coupling) and, for
+this problem, happens to reproduce the finite-difference scheme to within
+<code>2 × 10⁻⁶</code>. The implementation offers both so that the equivalence can
+be demonstrated rather than asserted.</p>
+
+<div class="note"><strong>Why offer both.</strong> The test suite checks the
+consistent-mass error, the lumped-mass error, and the gap between the lumped
+result and the finite-difference result. The lumped-vs-FD gap is the number that
+matters: it is the evidence that lumping recovers the FD scheme, not a hand-waving
+claim.</div>
+</section>
+
+<section id="equivalence">
+<h2>The finite-difference equivalence</h2>
+
+<p>Lumping the mass matrix collapses the off-diagonal coupling in the time term to
+zero and sets the diagonal to <code>h</code>. The system that results is:</p>
+
+<div class="formula"><code>
+h · (dV/dτ)_i = (-a K + b B - r h I) V   →   dV/dτ = (-a/h K + b/h B - r I) V
+</code></div>
+
+<p>The <code>-a/h K + b/h B - r I</code> row is, element by element, the same as
+the finite-difference operator row <code>α, β, γ</code> — the stiffness gives
+<code>-a/h · (-1, 2, -1)</code>, the convection gives <code>b · (-½, 0, ½)</code>,
+and the reaction gives <code>-r</code> on the diagonal. So the lumped FE scheme is
+the finite-difference scheme with a particular (and correct) identification of the
+step size.</p>
+
+<div class="note"><strong>The number.</strong> The test suite measures the gap
+between the lumped-mass FEM price and the finite-difference price at 800 elements.
+That gap is below <code>5 × 10⁻⁴</code> — and the implementation’s own
+documentation states the tighter bound of <code>2 × 10⁻⁶</code>, which is the
+figure worth being able to demonstrate. The page reports the test’s bound; the
+code’s bound is tighter still.</div>
+</section>
+
+<section id="time">
+<h2>Time-stepping</h2>
+
+<p>The time-stepping is identical in structure to the finite-difference module,
+because the matrices are tridiagonal in both cases and the Thomas solver is
+shared (<code>finite_element.hpp</code> includes <code>finite_difference.hpp</code>
+for <code>solve_tridiagonal</code>, <code>FdScheme</code>, and <code>theta_of</code>).</p>
+
+<p>Each step builds the right-hand side as <code>(M + (1-θ)·dt·A) Vⁿ</code> with
+the boundary terms moved across, solves the tridiagonal system, and applies
+American projection if requested:</p>
+
+<pre><code>for (size_t k = 0; k < m; ++k) {
+    const size_t i = k + 1;
+    rhs[k] = (m_off*v[i-1] + m_dia*v[i] + m_off*v[i+1])
+           + w*(a_low*v[i-1] + a_dia*v[i] + a_upp*v[i+1]);
+}
+rhs[0] -= (m_off - θ·dt·a_low) * v_lo;
+rhs[m-1] -= (m_off - θ·dt·a_upp) * v_hi;
+
+solve_tridiagonal(lower, diag, upper, rhs, scratch);</code></pre>
+
+<p>The boundary conditions are the same asymptotics as the finite-difference
+module: deep out-of-the-money worthless, deep in-the-money call = discounted
+forward, put = discounted strike less discount spot, with the early-exercise
+maximum for an American contract.</p>
+</section>
+
+<section id="boundaries">
+<h2>Boundaries and American exercise</h2>
+
+<p>The two boundary nodes are imposed before each step from the same asymptotics
+as the finite-difference module. For a European contract they are the discounted
+forward (call) or the discounted strike-minus-spot (put). For an American contract
+the boundary value is the maximum of that asymptotic value and the payoff.</p>
+
+<p>American exercise is handled the same way as in the finite-difference module —
+explicit projection onto the payoff after each step:</p>
+
+<pre><code>if (opt.exercise == Exercise::American)
+    for (size_t i = 0; i <= n; ++i)
+        v[i] = std::fmax(v[i], opt.payoff(exp(x[i])));</code></pre>
+
+<p>The same limitation applies: this is explicit projection, first order in time
+near the free boundary even under Crank–Nicolson, and stated for the same reason
+it is stated in the finite-difference module.</p>
+</section>
+
+<section id="source">
+<h2>Source</h2>
+
+<div class="fileref">
+  <p class="fref-label">Implementation</p>
+  <p class="fref-path">include/convergence/finite_element.hpp — Galerkin P1, consistent/lumped mass, shared Thomas solver</p>
+  <div class="fref-links">
+    <a href="https://github.com/omarja12/convergence-lab/blob/main/include/convergence/finite_element.hpp">View on GitHub →</a>
+  </div>
+</div>
+
+<div class="fileref" style="margin-top:12px">
+  <p class="fref-label">Demo / comparison</p>
+  <p class="fref-path">src/main.cpp — consistent-mass and lumped-mass prices against the closed form, alongside the FD price</p>
+  <div class="fref-links">
+    <a href="https://github.com/omarja12/convergence-lab/blob/main/src/main.cpp">View on GitHub →</a>
+  </div>
+</div>
+
+<div class="fileref" style="margin-top:12px">
+  <p class="fref-label">Tests</p>
+  <p class="fref-path">tests/test_convergence.cpp — FEM consistent/lumped vs analytic, lumped vs FD gap, second-order check</p>
+  <div class="fref-links">
+    <a href="https://github.com/omarja12/convergence-lab/blob/main/tests/test_convergence.cpp">View on GitHub →</a>
+  </div>
+</div>
+
+<a class="back-link" href="index.html">
+  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M11 3L5 8l6 5"/></svg>
+  ← All methods
+</a>
+
+</article>
+
+</div>
+
+<footer class="site-foot">
+  <span>convergence-lab</span>
+  <span class="sep">/</span>
+  <a href="index.html">Index</a>
+  <span class="sep">·</span>
+  <a href="https://github.com/omarja12/convergence-lab">GitHub</a>
+  <span class="sep">·</span>
+  <a href="mailto:jarir.omar@hotmail.fr">jarir.omar@hotmail.fr</a>
+</footer>
+
+</div>
+
+</body>
+</html>
