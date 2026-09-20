@@ -1,304 +1,418 @@
 <!DOCTYPE html>
+
 <html lang="en">
+
 <head>
+
 <meta charset="utf-8">
+
 <meta name="viewport" content="width=device-width, initial-scale=1">
+
 <title>Lattices — convergence-lab</title>
+
 <meta name="description" content="Binomial trees in three parameterisations — Cox–Ross–Rubinstein, Jarrow–Rudd, Tian — and the Boyle trinomial. How moment matching shapes convergence, not just the price.">
+
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
+
 <link rel="stylesheet" href="reference.css">
 
+
+
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
-<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
-<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
-<script>
-document.addEventListener("DOMContentLoaded", function() {
-  renderMathInElement(document.body, {
-    delimiters: [
-      {left: "\\[", right: "\\]", display: true},
-      {left: "$", right: "$", display: false}
-    ],
-    throwOnError: false
-  });
-});
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js">
+
+if (document.readyState === "complete" || document.readyState === "interactive") { renderMathInElement(document.body, { delimiters: [{left: "\[", right: "\]", display: true}, {left: "$", right: "$", display: false}], throwOnError: false }); }
+
 </script>
 
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+
+<script>
+
+window.addEventListener("load", function() {
+
+  renderMathInElement(document.body, {
+
+    delimiters: [
+
+      {left: "\\[", right: "\\]", display: true},
+
+      {left: "$", right: "$", display: false}
+
+    ],
+
+    throwOnError: false
+
+  });
+
+});
+
+</script>
+
+
+
 </head>
+
 <body>
+
+
 
 <div class="wrap">
 
+
+
 <header class="site-head">
+
   <a class="brand" href="index.html">
+
     <span class="repo-word">convergence-lab</span>
+
     <span class="repo-name">/</span>
+
     <span class="repo-name">methods</span>
+
   </a>
+
   <span style="font-family:var(--mono);font-size:0.7rem;color:var(--ink-soft)">C++20 · MIT</span>
+
 </header>
 
+
+
 <div class="page-head">
+
   <p class="crumb">Method reference · Lattices</p>
+
   <h1>Tree methods for the Black–Scholes PDE</h1>
+
   <p class="lead">A family of discrete approximations that converge to the closed form by
+
   refining a grid of stock prices through time — backwards, from the payoff at
+
   maturity to the value today. The question is not whether they land near the
+
   analytic price, but how they converge, and how the moment-matching choices
+
   inside the tree show up in that convergence.</p>
+
 </div>
 
+
+
 <nav class="method-nav" aria-label="Method pages">
+
   <a href="finite-differences.html">Finite differences</a>
+
   <span class="sep">·</span>
+
   <a href="finite-elements.html">Finite elements</a>
+
   <span class="sep">·</span>
+
   <a href="monte-carlo.html">Monte Carlo</a>
+
   <span class="sep">·</span>
+
   <a href="index.html" style="color:var(--ink-soft)">← Index</a>
+
 </nav>
+
+
 
 <div class="two-col">
 
+
+
 <aside class="sidebar">
+
   <h3>On this page</h3>
+
   <ul class="toc">
+
     <li><a href="#binomial" class="current">Binomial trees</a></li>
+
     <li class="toc-sub"><a href="#crr">Cox–Ross–Rubinstein</a></li>
+
     <li class="toc-sub"><a href="#jr">Jarrow–Rudd</a></li>
+
     <li class="toc-sub"><a href="#tian">Tian</a></li>
+
     <li><a href="#trinomial">Boyle trinomial</a></li>
+
     <li><a href="#american">American exercise</a></li>
+
     <li><a href="#guards">Guards</a></li>
+
     <li><a href="#convergence">Convergence</a></li>
+
     <li><a href="#source">Source</a></li>
+
   </ul>
+
 </aside>
+
+
 
 <article class="article">
 
+
+
 <section id="binomial">
+
 <h2>Binomial trees</h2>
 
+
+
 <p>A binomial tree discretises the risk-neutral dynamics of the stock into a
+
 recombining lattice of nodes. At each step the stock either moves up by a factor
+
 <code>u</code> or down by <code>d</code>, with the up-move probability set so the
+
 tree matches the right moments of the log-normal distribution. Working backwards
+
 from the terminal payoff, one layer at a time, gives the value at the root —
+
 which is the price.</p>
 
+
+
 <p>The tree is <em>recombining</em>: an up-then-down move lands on the same node
+
 as a down-then-up move. That keeps the layer size at <code>n+1</code> nodes for
+
 <code>n</code> steps, instead of <code>2^n</code>. The price of that simplicity is
+
 that the three binomial parameterisations below differ only in how they choose
+
 <code>u</code>, <code>d</code>, and <code>p</code> — and those choices are visible
+
 in the convergence, not just the price.</p>
 
+
+
 <p class="note"><strong>The point of distinguishing them.</strong> All three
+
 binomials converge to Black–Scholes at first order. What differs is the size of
+
 the oscillatory error term and how it depends on where the strike sits relative
+
 to the terminal nodes. A case that measures convergence cleanly for one
+
 parameterisation can report a misleading order for another, even though the
+
 underlying scheme is the same.</p>
+
 </section>
+
+
 
 <section id="crr">
+
 <h3>Cox–Ross–Rubinstein</h3>
 
+
+
 <p>The standard choice. Up and down are symmetric inverses, <code>u = 1/d</code>,
+
 and the up-probability is set so the tree matches the first two moments of the
+
 risk-neutral distribution:</p>
 
-<div class="formula">[u = \exp(\sigma \sqrt{\Delta t}) \qquad d = 1/u \qquad p = \frac{e^{(r-q)\Delta t} - d}{u - d}]</div>
 
-<p>The symmetry is what makes CRR the textbook default, but it also makes the
-tree sensitive to strike placement. When the spot equals the strike and the step
-count is even, <code>S₀ = K</code> lands exactly on the central terminal node.
-The oscillatory error term that a vanilla payoff normally excites vanishes, and
-the underlying <code>O(1/n)</code> convergence is exposed cleanly. The test suite
-uses exactly this configuration — <code>S₀ = K</code>, even steps — for the
-first-order check, because it is the case where the rate is honest rather than
-contaminated by node alignment.</p>
 
-<div class="note"><strong>Measured order:</strong> 1.000, on CRR with
-<code>S₀ = K</code> across {250, 500, 1000, 2000} steps. The test explicitly
-notes that Jarrow–Rudd on the same sizes gives an <em>erratic</em> observed order
-(0.5 to 3.2), not because JR is wrong, but because the strike falls between its
-drift-shifted nodes and the oscillatory term dominates. Measuring convergence on
-JR here would report a property of the node alignment, not of the scheme.</div>
+<div class="formula">\[u = \exp(\sigma \sqrt{\Delta t}) \qquad d = 1/u \qquad p = \frac{e^{(r-q)\Delta t} - d}{u - d}\]
+
+\[u = \exp!\big((r - q - \tfrac{1}{2}\sigma^2)\Delta t + \sigma\sqrt{\Delta t}\big) \qquad d = \exp!\big((r - q - \tfrac{1}{2}\sigma^2)\Delta t - \sigma\sqrt{\Delta t}\big)\]
+
+\[v = e^{\sigma^2 \Delta t} \qquad u = \frac{1}{2} e^{(r-q)\Delta t} v \big(v + 1 + \sqrt{v^2 + 2v - 3}\big) \qquad d = \frac{1}{2} e^{(r-q)\Delta t} v \big(v + 1 - \sqrt{v^2 + 2v - 3}\big)\]
+
+\[dx = \sigma\sqrt{3\Delta t} \qquad p_{\uparrow} = \frac{1}{2}\left(\frac{\sigma^2\Delta t + \nu^2\Delta t^2}{dx^2} + \frac{\nu\Delta t}{dx}\right) \qquad p_{\downarrow} = \frac{1}{2}\left(\frac{\sigma^2\Delta t + \nu^2\Delta t^2}{dx^2} - \frac{\nu\Delta t}{dx}\right) \qquad p_{\bullet} = 1 - p_{\uparrow} - p_{\downarrow}\]</div>
+
 </section>
 
-<section id="jr">
-<h3>Jarrow–Rudd</h3>
 
-<p>Equal probabilities, <code>p = 1/2</code>. The drift is absorbed into the node
-spacing instead of into the probability:</p>
-
-<div class="formula">[u = \exp!\big((r - q - \tfrac{1}{2}\sigma^2)\Delta t + \sigma\sqrt{\Delta t}\big) \qquad d = \exp!\big((r - q - \tfrac{1}{2}\sigma^2)\Delta t - \sigma\sqrt{\Delta t}\big)]</div>
-
-<p>This choice makes the tree’s node centres track the forward mean, which is
-appealing when the strike is far from spot. It also makes the convergence
-measurement less clean for an at-the-money vanilla, because the strike no longer
-lands on a node at even steps and the oscillatory error term comes back. The
-implementation keeps JR available because it is a legitimate parameterisation;
-the test suite does not use it for the order check, and says so.</p>
-</section>
-
-<section id="tian">
-<h3>Tian</h3>
-
-<p>Matches the first <em>three</em> moments of the log-normal distribution exactly,
-which buys a smaller truncation error at a given step count:</p>
-
-<div class="formula">[v = e^{\sigma^2 \Delta t} \\
-u = \frac{1}{2} e^{(r-q)\Delta t} v \big(v + 1 + \sqrt{v^2 + 2v - 3}\big) \\
-d = \frac{1}{2} e^{(r-q)\Delta t} v \big(v + 1 - \sqrt{v^2 + 2v - 3}\big)]</div>
-
-<p>Tian is the most accurate of the three binomials at a fixed <code>n</code>, but
-it is still first order. The implementation includes it so the tree module covers
-the moment-matching spectrum from two moments (CRR) to three (Tian), and so the
-test that all three binomials agree at 4000 steps has something to agree with.</p>
-</section>
-
-<section id="trinomial">
-<h2>Boyle trinomial</h2>
-
-<p>The trinomial tree adds a middle branch. That extra branch is a free parameter,
-and the usual choice <code>dx = σ√(3Δt)</code> keeps all three transition
-probabilities positive while giving the same <code>O(1/n)</code> convergence with
-a smaller constant than the binomial:</p>
-
-<div class="formula">[dx = \sigma\sqrt{3\Delta t} \\
-p_{\uparrow} = \frac{1}{2}\left(\frac{\sigma^2\Delta t + \nu^2\Delta t^2}{dx^2} + \frac{\nu\Delta t}{dx}\right) \\
-p_{\downarrow} = \frac{1}{2}\left(\frac{\sigma^2\Delta t + \nu^2\Delta t^2}{dx^2} - \frac{\nu\Delta t}{dx}\right) \\
-p_{\bullet} = 1 - p_{\uparrow} - p_{\downarrow}]</div>
-
-<p>where <code>ν = r - q - σ²/2</code>.</p>
-
-<div class="note"><strong>Why a scratch layer.</strong> Unlike the binomial, each
-trinomial node reads its neighbour above <em>and</em> below in the same sweep. If
-you update the value array in place, you consume a value that was already
-overwritten earlier in this step and silently return a wrong price. The
-implementation keeps a second layer and swaps between them, so a mistake of this
-kind is impossible rather than merely unlikely. The comment in the source says the
-same thing.</div>
-
-<p>The trinomial is here for the same reason the three binomials are: the tree
-module is meant to cover the discretisation options that are actually used, and a
-reader looking at how these methods compare should be able to see them all side by
-side. The convergence study plots CRR; the demo prices all four.</p>
-</section>
-
-<section id="american">
-<h2>American exercise</h2>
-
-<p>An American option can be exercised at any node, not only at maturity. On a
-tree that is handled by taking the maximum of the continuation value and the
-payoff at every node during the backward induction:</p>
-
-<pre><code>value[k] = disc * (p_up * value[k+1] + (1-p_up) * value[k]);
-if (opt.exercise == Exercise::American)
-    value[k] = std::fmax(value[k], opt.payoff(s));</code></pre>
-
-<p>That is exactly the discrete obstacle problem the PDE formulation solves
-variationally, and it is why the tree can price an American contract while forward
-simulation cannot. The test suite checks that an American put exceeds its European
-counterpart — the early-exercise premium is positive by construction, and the tree
-reproduces it.</p>
-
-<div class="note"><strong>No closed form for the American put.</strong> The test
-<code>main.cpp</code> prices an American put by the tree and compares it against the
-European put, explicitly noting that no analytic solution exists for the American
-case — the lattice is the reference, not a cross-check against a formula.</div>
-</section>
 
 <section id="guards">
+
 <h2>Guards</h2>
 
+
+
 <p>A binomial tree has one failure mode that a wrong-but-plausible implementation
+
 can hide: if the time step is too large for the volatility, the risk-neutral
+
 probability leaves <code>[0,1]</code> and the tree would admit arbitrage. The
+
 implementation tests for this and raises rather than returning a number:</p>
 
+
+
 <pre><code>if (lp.p_up &lt; 0.0 || lp.p_up &gt; 1.0)
+
     throw std::runtime_error(
+
         "binomial: risk-neutral probability outside [0,1] - "
+
         "time step too large for this volatility; "
+
         "the tree would admit arbitrage");</code></pre>
 
+
+
 <p>The test suite exercises this directly — a market with high rate and low
+
 volatility and a two-step tree — and checks that an exception is thrown. The point
+
 is the same one that runs through the whole library: a scheme that is wrong should
+
 say so, not return a price that looks fine.</p>
+
 </section>
+
+
 
 <section id="convergence">
+
 <h2>Convergence</h2>
 
+
+
 <p>All four tree methods converge to the closed form at first order in the step
+
 count. The differences between them show up in the size of the error and in how
+
 stable that error is as the strike moves relative to the nodes:</p>
 
+
+
 <table class="ref">
+
   <thead><tr><th>Method</th><th>Order</th><th>Notes</th></tr></thead>
+
   <tbody>
+
     <tr><td>Binomial CRR</td><td class="num">1</td><td><code>S₀=K</code>, even steps — strike on a node, oscillation vanishes</td></tr>
+
     <tr><td>Binomial Jarrow–Rudd</td><td class="num">1</td><td>Drift in nodes, p=½; order measurement sensitive to strike placement</td></tr>
+
     <tr><td>Binomial Tian</td><td class="num">1</td><td>Matches 3 moments; smallest constant at fixed <code>n</code></td></tr>
+
     <tr><td>Boyle trinomial</td><td class="num">1</td><td>Extra branch buys a smaller constant; needs scratch layer</td></tr>
+
   </tbody>
+
 </table>
 
+
+
 <p>The convergence study plots CRR only, because it is the parameterisation whose
+
 order is cleanest to measure. The demo prices all four against the closed form and
+
 prints the error of each.</p>
+
 </section>
 
+
+
 <section id="source">
+
 <h2>Source</h2>
 
+
+
 <div class="fileref">
+
   <p class="fref-label">Implementation</p>
+
   <p class="fref-path">include/convergence/lattice.hpp — binomial (CRR, Jarrow–Rudd, Tian), Boyle trinomial, American exercise</p>
+
   <div class="fref-links">
+
     <a href="https://github.com/omarja12/convergence-lab/blob/main/include/convergence/lattice.hpp">View on GitHub →</a>
+
   </div>
+
 </div>
 
+
+
 <div class="fileref" style="margin-top:12px">
+
   <p class="fref-label">Tests</p>
+
   <p class="fref-path">tests/test_convergence.cpp — first-order check, agreement across parameterisations, American put, bad-step guard</p>
+
   <div class="fref-links">
+
     <a href="https://github.com/omarja12/convergence-lab/blob/main/tests/test_convergence.cpp">View on GitHub →</a>
+
   </div>
+
 </div>
 
+
+
 <div class="fileref" style="margin-top:12px">
+
   <p class="fref-label">Reference</p>
+
   <p style="margin:0;font-size:0.88rem;color:var(--ink-mid)">Boyle, P. (1986). <em>Option Valuation Using a Three-Jump Process.</em>
+
   Jarrow, R. and Rudd, A. (1983). <em>Option Pricing.</em>
+
   Tian, Y. (1993). <em>A modified lattice approach to option pricing.</em></p>
+
 </div>
+
+
 
 <a class="back-link" href="index.html">
+
   <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M11 3L5 8l6 5"/></svg>
+
   ← All methods
+
 </a>
+
+
 
 </article>
 
+
+
 </div>
+
+
 
 <footer class="site-foot">
+
   <span>convergence-lab</span>
+
   <span class="sep">/</span>
+
   <a href="index.html">Index</a>
+
   <span class="sep">·</span>
+
   <a href="https://github.com/omarja12/convergence-lab">GitHub</a>
+
   <span class="sep">·</span>
+
   <a href="mailto:jarir.omar@hotmail.fr">jarir.omar@hotmail.fr</a>
+
 </footer>
+
+
 
 </div>
 
+
+
 </body>
+
 </html>
+

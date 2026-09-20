@@ -1,335 +1,316 @@
 <!DOCTYPE html>
+
 <html lang="en">
+
 <head>
+
 <meta charset="utf-8">
+
 <meta name="viewport" content="width=device-width, initial-scale=1">
+
 <title>Finite Differences — convergence-lab</title>
+
 <meta name="description" content="The θ-family of finite difference schemes on the log-transformed Black-Scholes PDE: explicit, Crank-Nicolson, implicit — with the Thomas solver, Rannacher start-up, and why the log transformation is not cosmetic.">
+
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
+
 <link rel="stylesheet" href="reference.css">
 
+
+
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+
 <script>
-document.addEventListener("DOMContentLoaded", function() {
+
+window.addEventListener("load", function() {
+
   renderMathInElement(document.body, {
+
     delimiters: [
+
       {left: "\\[", right: "\\]", display: true},
+
       {left: "$", right: "$", display: false}
+
     ],
+
     throwOnError: false
+
   });
+
 });
-</script>
+
+// Also try immediately in case load already fired
+
+if (document.readyState === "complete" || document.readyState === "interactive") {
+
+  renderMathInElement(document.body, {
+
+    delimiters: [
+
+      {left: "\\[", right: "\\]", display: true},
+
+      {left: "$", right: "$", display: false}
+
+    ],
+
+    throwOnError: false
+
+  });
+
+}</script>
+
+
 
 </head>
+
 <body>
+
+
 
 <div class="wrap">
 
+
+
 <header class="site-head">
+
   <a class="brand" href="index.html">
+
     <span class="repo-word">convergence-lab</span>
+
     <span class="repo-name">/</span>
+
     <span class="repo-name">methods</span>
+
   </a>
+
   <span style="font-family:var(--mono);font-size:0.7rem;color:var(--ink-soft)">C++20 · MIT</span>
+
 </header>
 
+
+
 <div class="page-head">
+
   <p class="crumb">Method reference · Finite differences</p>
+
   <h1>The θ-family on the log-transformed PDE</h1>
+
   <p class="lead">Solve the Black–Scholes PDE by stepping it forward in time with a
+
   tridiagonal system, in log-spot so every coefficient is constant. One parameter
+
   — θ — covers explicit, Crank–Nicolson, and implicit. The interesting part is
+
   not the family itself but the case where θ = ½ fails to deliver its advertised
+
   second order on a vanilla payoff, and the two half-steps that fix it.</p>
+
 </div>
 
+
+
 <nav class="method-nav" aria-label="Method pages">
+
   <a href="lattices.html">Lattices</a>
+
   <span class="sep">·</span>
+
   <a href="finite-elements.html">Finite elements</a>
+
   <span class="sep">·</span>
+
   <a href="monte-carlo.html">Monte Carlo</a>
+
   <span class="sep">·</span>
+
   <a href="index.html" style="color:var(--ink-soft)">← Index</a>
+
 </nav>
+
+
 
 <div class="two-col">
 
+
+
 <aside class="sidebar">
+
   <h3>On this page</h3>
+
   <ul class="toc">
+
     <li><a href="#pde" class="current">The PDE, in log-spot</a></li>
+
     <li><a href="#theta">The θ-family</a></li>
+
     <li><a href="#thomas">Thomas solver</a></li>
+
     <li><a href="#rannacher">Rannacher start-up</a></li>
+
     <li><a href="#stability">Stability reporting</a></li>
+
     <li><a href="#boundaries">Boundary conditions</a></li>
+
     <li><a href="#american">American projection</a></li>
+
     <li><a href="#source">Source</a></li>
+
   </ul>
+
 </aside>
+
+
 
 <article class="article">
 
+
+
 <section id="pde">
+
 <h2>The PDE, in log-spot</h2>
 
+
+
 <p>The Black–Scholes PDE for the option value <code>V(S,t)</code> is not solved
+
 in spot. It is solved in <code>x = ln S</code>, with time-to-maturity
+
 <code>τ = T - t</code>:</p>
 
-<div class="formula">[\frac{dV}{d\tau} = \frac{1}{2}\sigma^2 \frac{d^2V}{dx^2} + (r - q - \frac{1}{2}\sigma^2) \frac{dV}{dx} - rV]</div>
 
-<div class="note"><strong>This transformation is not cosmetic.</strong> In
-<code>S</code>, the coefficients carry <code>S</code> and <code>S²</code>, so the
-truncation error varies across the grid and the matrix has to be rebuilt every
-time the grid changes. In <code>x</code> every coefficient is constant — one
-tridiagonal matrix serves every time step, and the scheme is uniformly accurate
-across the domain. The implementation chooses the grid so that <code>x₀ = ln S₀</code>
-sits exactly on a node, at index <code>n/2</code> when <code>n</code> is even.</div>
 
-<p>The PDE is written as an operator on the interior nodes, with two boundary
-nodes imposed from the known asymptotics of the contract. The interior system has
-<code>n-1</code> unknowns; the two ends are Dirichlet conditions set before each
-step.</p>
-</section>
+<div class="formula">\[\frac{dV}{d\tau} = \frac{1}{2}\sigma^2 \frac{d^2V}{dx^2} + (r - q - \frac{1}{2}\sigma^2) \frac{dV}{dx} - rV\]
 
-<section id="theta">
-<h2>The θ-family</h2>
+\[(1 - \theta \cdot h \cdot L)\, V^{n+1} = (1 + (1-\theta) \cdot h \cdot L)\, V^n\]
 
-<p>One scalar parameter, <code>θ</code>, covers three schemes. The time-stepping
-writes the solution at the new time as a weighted blend of explicit and implicit
-evaluations of the spatial operator <code>L</code>:</p>
+\[\frac{dV}{d\tau} = \frac{1}{2}\sigma^2 \frac{d^2V}{dx^2} + (r - q - \frac{1}{2}\sigma^2) \frac{dV}{dx} - rV\]</div>
 
-<div class="formula">[(1 - \theta \cdot h \cdot L)\, V^{n+1} = (1 + (1-\theta) \cdot h \cdot L)\, V^n]</div>
 
-<table class="ref">
-  <thead><tr><th>θ</th><th>Scheme</th><th>Order in time</th><th>Stability</th></tr></thead>
-  <tbody>
-    <tr><td class="num">0</td><td>Explicit Euler</td><td class="num">O(Δτ)</td><td>Conditionally stable — ratio ≤ ½</td></tr>
-    <tr><td class="num">½</td><td>Crank–Nicolson</td><td class="num">O(Δτ²)</td><td>Unconditionally stable</td></tr>
-    <tr><td class="num">1</td><td>Implicit Euler</td><td class="num">O(Δτ)</td><td>Unconditionally stable</td></tr>
-  </tbody>
-</table>
-
-<p>The implementation does not special-case the three schemes. It computes
-<code>θ</code> from the enum and runs the same step logic for all three:</p>
-
-<pre><code>enum class FdScheme { Explicit, Implicit, CrankNicolson };
-
-inline double theta_of(FdScheme s) noexcept {
-    switch (s) {
-        case FdScheme::Explicit:        return 0.0;
-        case FdScheme::CrankNicolson:   return 0.5;
-        case FdScheme::Implicit:        return 1.0;
-    }
-    return 1.0;
-}</code></pre>
-
-<p>The spatial operator coefficients are the same for every scheme, set once per
-grid:</p>
-
-<pre><code>const double a  = 0.5 * sig * sig;       // diffusion
-const double b  = r - q - 0.5 * sig * sig; // convection
-const double alpha  = a/(dx*dx) - b/(2*dx);
-const double beta_c = -2*a/(dx*dx) - r;
-const double gamma  = a/(dx*dx) + b/(2*dx);</code></pre>
-
-<p>The interior row of the operator is then
-<code>L Vᵢ = α·Vᵢ₋₁ + β·Vᵢ + γ·Vᵢ₊₁</code>, and a θ-step of size <code>h</code>
-builds the tridiagonal system from <code>-th·h·α</code>, <code>1 - th·h·β</code>,
-<code>-th·h·γ</code> on the lower, diagonal, and upper.</p>
-</section>
-
-<section id="thomas">
-<h2>Thomas solver</h2>
-
-<p>The tridiagonal system is solved in <code>O(n)</code> by the Thomas algorithm —
-forward elimination, backward substitution. No pivoting:</p>
-
-<pre><code>double beta = diag[0];
-rhs[0] /= beta;
-for (size_t i = 1; i < n; ++i) {
-    scratch[i] = upper[i-1] / beta;
-    beta = diag[i] - lower[i] * scratch[i];
-    rhs[i] = (rhs[i] - lower[i] * rhs[i-1]) / beta;
-}
-for (size_t i = n-1; i-- > 0;)
-    rhs[i] -= scratch[i+1] * rhs[i+1];</code></pre>
-
-<div class="note"><strong>No pivoting is safe here and nowhere in general.</strong>
-The matrices produced by the θ-family are diagonally dominant for <code>θ &gt; 0</code>,
-which is exactly the condition under which unpivoted elimination is stable. The
-explicit scheme (<code>θ = 0</code>) is the one case where the matrix is not
-tridiagonal-solveable at all — and it is not solved, it is applied explicitly.
-The comment in the source states this.</div>
-</section>
-
-<section id="rannacher">
-<h2>Rannacher start-up</h2>
-
-<p>This is the reason the repository exists. Crank–Nicolson is second-order
-accurate <strong>for smooth data</strong>. A vanilla payoff is not smooth — it has
-a kink at the strike. That kink excites high-frequency modes in the grid. Crank–
-Nicolson’s amplification factor tends to <code>−1</code> as frequency rises, so
-those modes are not damped; they alternate sign. The observable result is
-oscillation near the strike and a measured order closer to 1 than 2.</p>
-
-<div class="formula">[measured order, CN without fix:  1.202
-measured order, CN with Rannacher: 1.898]</div>
-
-<p>The fix is two fully implicit half-steps at the start, before handing over to
-Crank–Nicolson for the rest of the run. Implicit Euler damps high-frequency modes
-completely, so once they are gone the rest of the run is second order as
-advertised. The half-steps are <em>not</em> a refinement — they do not improve the
-accuracy of a scheme that was already working. They are a correctness fix for a
-scheme that is otherwise quietly wrong on exactly the payoffs anyone would price
-with it.</p>
-
-<pre><code>FdConfig cfg;
-cfg.scheme = FdScheme::CrankNicolson; // default
-cfg.rannacher_steps = 2;               // default — two half-steps
-
-// Disable to observe the degradation directly:
-cfg.rannacher_steps = 0;</code></pre>
-
-<div class="warn"><strong>The degradation is visible only at coarse time steps.</strong>
-At 800 time steps the oscillation has long since been damped by sheer step count
-and the spatial error dominates, which is why the demo table shows the two CN
-variants agreeing there. The convergence test deliberately refines time while
-holding space fine (<code>space_steps = 2000</code>, <code>time_steps ∈ {10,20,40,80}</code>),
-so the effect is not masked. Both variants are kept in the test suite — the
-<em>failure</em> reproduces, not only the fix.</div>
-
-<p>The start-up applies only to Crank–Nicolson. An implicit scheme already damps
-the modes and gains nothing; the explicit scheme is a different stability problem
-entirely. The implementation sets <code>rannacher_steps = 0</code> for anything
-that is not Crank–Nicolson.</p>
-</section>
-
-<section id="stability">
-<h2>Stability reporting</h2>
-
-<p>The explicit scheme is conditionally stable: it requires
-<code>a·Δτ / Δx² ≤ ½</code>. Rather than let the caller discover instability from
-a price that has exploded, the implementation computes and reports the ratio and
-flags whether it is safe:</p>
-
-<pre><code>out.stability_ratio = a * dt / (dx * dx);
-out.stability_ok = (cfg.scheme != FdScheme::Explicit)
-                   || (out.stability_ratio &lt;= 0.5);</code></pre>
-
-<p>The test suite checks this directly — an explicitly configured unstable grid is
-flagged, and a stable one gives a small error. The idea is the same one that runs
-through the library: a scheme that is wrong should say so, not return a number
-that looks fine.</p>
-</section>
-
-<section id="boundaries">
-<h2>Boundary conditions</h2>
-
-<p>The two ends of the grid are not solved; they are imposed from the known
-asymptotics of the contract. Deep out-of-the-money, the option is worthless. Deep
-in-the-money, a call is the discounted forward and a put is the discounted strike
-less the discounted spot:</p>
-
-<pre><code>// Call
-v_lo = 0.0;
-v_hi = s_hi * exp(-q*τ) - K * exp(-r*τ);
-
-// Put
-v_lo = K * exp(-r*τ) - s_lo * exp(-q*τ);
-v_hi = 0.0;</code></pre>
-
-<p>For an American contract the boundary value is the maximum of the asymptotic
-value and the payoff — the early-exercise premium can make the boundary worth more
-than the asymptotic formula. The implementation takes that maximum before each
-step.</p>
-
-<p>The right-hand side of the interior system receives the boundary contributions
-of the implicit part of the operator, moved across: <code>-th·h·α·v_lo</code> on
-the first row and <code>-th·h·γ·v_hi</code> on the last.</p>
-</section>
-
-<section id="american">
-<h2>American projection</h2>
-
-<p>American exercise on a finite difference grid is handled by projecting onto the
-payoff after each time step — taking the maximum of the computed value and the
-payoff at every node:</p>
-
-<pre><code>if (opt.exercise == Exercise::American)
-    for (size_t i = 0; i <= n; ++i)
-        v[i] = std::fmax(v[i], opt.payoff(exp(x[i])));</code></pre>
-
-<div class="warn"><strong>This is explicit projection, not a full
-linear-complementarity solve.</strong> It is first order in time near the free
-boundary even under Crank–Nicolson. The implementation states this because it is a
-real limitation, not because it is convenient to omit. A full LCP solve would be
-second order at the boundary; this code does not attempt one.</div>
 
 <p>For a European contract the projection is skipped entirely. The step
+
 configuration — explicit, implicit, or Crank–Nicolson — is the same; only the
+
 American flag changes whether the projection runs.</p>
+
 </section>
 
+
+
 <section id="source">
+
 <h2>Source</h2>
 
+
+
 <div class="fileref">
+
   <p class="fref-label">Implementation</p>
+
   <p class="fref-path">include/convergence/finite_difference.hpp — θ-family, Thomas solver, Rannacher start-up, stability reporting, log-spot grid</p>
+
   <div class="fref-links">
+
     <a href="https://github.com/omarja12/convergence-lab/blob/main/include/convergence/finite_difference.hpp">View on GitHub →</a>
+
   </div>
+
 </div>
 
+
+
 <div class="fileref" style="margin-top:12px">
+
   <p class="fref-label">Demo / comparison</p>
+
   <p class="fref-path">src/main.cpp — prices one contract every way, with errors against the closed form</p>
+
   <div class="fref-links">
+
     <a href="https://github.com/omarja12/convergence-lab/blob/main/src/main.cpp">View on GitHub →</a>
+
   </div>
+
 </div>
 
+
+
 <div class="fileref" style="margin-top:12px">
+
   <p class="fref-label">Tests</p>
+
   <p class="fref-path">tests/test_convergence.cpp — CN second order with/without Rannacher, implicit first order, FD second order in space, explicit stability boundary</p>
+
   <div class="fref-links">
+
     <a href="https://github.com/omarja12/convergence-lab/blob/main/tests/test_convergence.cpp">View on GitHub →</a>
+
   </div>
+
 </div>
 
+
+
 <div class="fileref" style="margin-top:12px">
+
   <p class="fref-label">Reference</p>
+
   <p style="margin:0;font-size:0.88rem;color:var(--ink-mid)">Rannacher, R. (1984). <em>Finite element solution of diffusion problems with irregular data.</em>
+
   Giles, M. and Carter, R. (2006). <em>Convergence analysis of Crank–Nicolson and Rannacher time-marching.</em></p>
+
 </div>
+
+
 
 <a class="back-link" href="index.html">
+
   <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M11 3L5 8l6 5"/></svg>
+
   ← All methods
+
 </a>
+
+
 
 </article>
 
+
+
 </div>
+
+
 
 <footer class="site-foot">
+
   <span>convergence-lab</span>
+
   <span class="sep">/</span>
+
   <a href="index.html">Index</a>
+
   <span class="sep">·</span>
+
   <a href="https://github.com/omarja12/convergence-lab">GitHub</a>
+
   <span class="sep">·</span>
+
   <a href="mailto:jarir.omar@hotmail.fr">jarir.omar@hotmail.fr</a>
+
 </footer>
+
+
 
 </div>
 
+
+
 </body>
+
 </html>
+
