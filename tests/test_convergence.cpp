@@ -329,6 +329,10 @@ void test_euler_is_biased_and_milstein_less_so() {
     auto err_of = [&](McScheme s, int steps) {
         McConfig cfg;
         cfg.paths = 200000; cfg.scheme = s; cfg.steps = steps; cfg.seed = 777;
+        // The controls take their means from the exact dynamics, so leaving
+        // them on here would fold a control bias into the discretisation bias
+        // this check is trying to measure. The library refuses the pairing.
+        cfg.antithetic = false; cfg.control_variate = false;
         return std::fabs(monte_carlo(kCall, kMkt, cfg).price - exact);
     };
     const double euler_coarse = err_of(McScheme::Euler, 4);
@@ -354,6 +358,263 @@ void test_american_rejected_by_monte_carlo() {
           "forward simulation cannot value an optimal stopping problem");
 }
 
+
+// ------------------------------------------- Monte Carlo variance reduction
+//
+// A variance reduction that is not checked for bias is a way of being wrong
+// with more confidence. Each technique below is run over many seeds: the mean
+// error must be consistent with zero, and the standard error the estimator
+// reports must match the spread the estimator actually has.
+
+struct SeedStudy {
+    double mean_error{};
+    double reported_se{};  // averaged over seeds
+    double realised_se{};  // spread of the price across seeds
+    double z{};            // mean error in standard errors of the mean
+};
+
+SeedStudy seed_study(const Option& o, const Market& m, McConfig cfg, int reps) {
+    const double exact = analytic_price(o, m);
+    double se_sum = 0, e_sum = 0, e_sq = 0;
+    for (int i = 0; i < reps; ++i) {
+        cfg.seed = 1000003ULL * static_cast<std::uint64_t>(i + 1) + 7ULL;
+        const auto r = monte_carlo(o, m, cfg);
+        const double e = r.price - exact;
+        e_sum += e;
+        e_sq += e * e;
+        se_sum += r.standard_error;
+    }
+    const double n = reps;
+    SeedStudy s;
+    s.mean_error = e_sum / n;
+    s.realised_se = std::sqrt(std::fmax(e_sq / n - s.mean_error * s.mean_error, 0.0));
+    s.reported_se = se_sum / n;
+    s.z = s.realised_se > 0.0 ? s.mean_error / (s.realised_se / std::sqrt(n)) : 0.0;
+    return s;
+}
+
+McConfig plain_mc(std::int64_t paths = 20000) {
+    McConfig c;
+    c.paths = paths;
+    c.antithetic = false;
+    c.control_variate = false;
+    return c;
+}
+
+void test_scheme_inconsistent_reductions_are_refused() {
+    // A reduction whose mean comes from the exact dynamics, run on a scheme
+    // that does not reproduce them, shifts the price by a constant. Refusing
+    // is the only honest option; the four that depend on the dynamics are
+    // checked here, and the three that do not must still be allowed through.
+    auto refuses = [](const McConfig& cfg) {
+        try { (void)monte_carlo(kCall, kMkt, cfg); return false; }
+        catch (const std::invalid_argument&) { return true; }
+    };
+    auto euler = [] {
+        McConfig c;
+        c.paths = 5000; c.scheme = McScheme::Euler; c.steps = 8;
+        c.antithetic = false; c.control_variate = false;
+        return c;
+    };
+    McConfig spot = euler();   spot.control_variate = true;
+    McConfig delta = euler();  delta.delta_control_variate = true;
+    McConfig mm = euler();     mm.moment_matching = true;
+    McConfig cond = euler();   cond.conditional_fraction = 0.5;
+    const bool all_refused = refuses(spot) && refuses(delta) && refuses(mm) && refuses(cond);
+
+    McConfig fine = euler();
+    fine.antithetic = true;
+    fine.stratified = true;
+    fine.importance_sampling = true;
+    bool allowed = true;
+    try { (void)monte_carlo(kCall, kMkt, fine); } catch (const std::exception&) { allowed = false; }
+
+    check("Reductions built on the exact dynamics are refused on a discretised scheme",
+          all_refused && allowed,
+          "both control variates, moment matching and conditional MC throw under Euler, "
+          "while antithetic, stratified and importance sampling still run");
+}
+
+void test_degenerate_control_is_dropped_not_divided_by() {
+    // Under a one-step scheme the delta hedge is an affine function of the
+    // terminal spot, so the two controls carry the same information and the
+    // normal equations are singular. Under antithetic sampling on a linear
+    // scheme it is worse: the control is constant, and its computed variance
+    // is pure rounding. Both must end with a finite, sane price.
+    McConfig cfg;
+    cfg.paths = 20000;
+    cfg.steps = 1;
+    cfg.antithetic = true;
+    cfg.control_variate = true;
+    cfg.delta_control_variate = true;
+    const double exact = analytic_price(kCall, kMkt);
+    bool ok = true;
+    double worst = 0.0;
+    for (std::uint64_t seed = 1; seed <= 50; ++seed) {
+        cfg.seed = seed;
+        const auto r = monte_carlo(kCall, kMkt, cfg);
+        const double e = std::fabs(r.price - exact);
+        worst = std::fmax(worst, e);
+        if (!std::isfinite(r.price) || !std::isfinite(r.standard_error) || e > 0.5) ok = false;
+    }
+    check("Collinear and constant controls are dropped rather than inverted", ok,
+          "worst error over 50 seeds with both controls fitted at one step is "
+              + std::to_string(worst));
+}
+
+void test_every_reduction_is_unbiased() {
+    constexpr int kReps = 120;
+    struct Case { const char* name; McConfig cfg; };
+    std::vector<Case> cases;
+    cases.push_back({"plain", plain_mc()});
+    { auto c = plain_mc(); c.antithetic = true;             cases.push_back({"antithetic", c}); }
+    { auto c = plain_mc(); c.control_variate = true;        cases.push_back({"CV spot", c}); }
+    { auto c = plain_mc(); c.steps = 8; c.delta_control_variate = true;
+                                                            cases.push_back({"CV delta", c}); }
+    { auto c = plain_mc(); c.stratified = true;             cases.push_back({"stratified", c}); }
+    { auto c = plain_mc(); c.importance_sampling = true;    cases.push_back({"importance", c}); }
+    { auto c = plain_mc(); c.conditional_fraction = 0.25;   cases.push_back({"conditional", c}); }
+    { auto c = plain_mc(); c.steps = 8; c.antithetic = true; c.control_variate = true;
+      c.delta_control_variate = true; c.stratified = true; c.conditional_fraction = 0.5;
+                                                            cases.push_back({"all of them", c}); }
+
+    bool ok = true;
+    std::string worst;
+    double worst_z = 0.0;
+    for (const auto& c : cases) {
+        const SeedStudy s = seed_study(kCall, kMkt, c.cfg, kReps);
+        if (std::fabs(s.z) > std::fabs(worst_z)) { worst_z = s.z; worst = c.name; }
+        // Three and a half sigma on the mean of 120 independent runs.
+        if (!(std::fabs(s.z) < 3.5)) ok = false;
+    }
+    check("Every unbiased variance reduction leaves the price unbiased", ok,
+          "worst over " + std::to_string(cases.size()) + " estimators is " + worst + " at z = "
+              + std::to_string(worst_z) + " (must stay inside 3.5)");
+}
+
+void test_reported_standard_error_is_honest() {
+    constexpr int kReps = 120;
+    // Stratification breaks independence, so the naive 1/sqrt(N) formula would
+    // be wrong here. The within-stratum estimator has to reproduce the spread
+    // the estimator really has.
+    auto strat = plain_mc();
+    strat.stratified = true;
+    const SeedStudy s = seed_study(kCall, kMkt, strat, kReps);
+    const double ratio = s.reported_se / s.realised_se;
+    check("Stratified sampling reports the standard error it actually has",
+          ratio > 0.8 && ratio < 1.25,
+          "reported " + std::to_string(s.reported_se) + " against a realised spread of "
+              + std::to_string(s.realised_se) + ", ratio " + std::to_string(ratio));
+}
+
+void test_moment_matching_is_the_biased_one() {
+    constexpr int kReps = 200;
+    auto mm = plain_mc(500);
+    mm.moment_matching = true;
+    const SeedStudy with = seed_study(kCall, kMkt, mm, kReps);
+    const SeedStudy without = seed_study(kCall, kMkt, plain_mc(500), kReps);
+
+    // It genuinely tightens the estimator, and the variance estimator cannot
+    // see that it has: the rescaling couples the paths. The interval it quotes
+    // is therefore conservative, and the price it quotes is biased at O(1/N).
+    const bool tighter = with.realised_se < 0.6 * without.realised_se;
+    const bool blind = with.reported_se > 1.5 * with.realised_se;
+    check("Moment matching tightens the estimator but no longer measures itself",
+          tighter && blind,
+          "realised spread " + std::to_string(without.realised_se) + " -> "
+              + std::to_string(with.realised_se) + ", while it still reports "
+              + std::to_string(with.reported_se));
+}
+
+void test_importance_sampling_rescues_the_tail() {
+    Option far = kCall;
+    far.strike = 160.0;  // finishes in the money about 3% of the time
+    const auto base = monte_carlo(far, kMkt, plain_mc(200000));
+    auto is_cfg = plain_mc(200000);
+    is_cfg.importance_sampling = true;
+    const auto shifted = monte_carlo(far, kMkt, is_cfg);
+    const double factor = base.standard_error / shifted.standard_error;
+    check("Importance sampling pays for itself where the payoff is rare", factor > 5.0,
+          "standard error " + std::to_string(base.standard_error) + " -> "
+              + std::to_string(shifted.standard_error) + ", a factor of "
+              + std::to_string(factor) + " at a shift of " + std::to_string(shifted.shift_used));
+}
+
+void test_delta_control_beats_the_spot_control() {
+    auto spot = plain_mc(200000);
+    spot.control_variate = true;
+    auto delta = plain_mc(200000);
+    delta.steps = 16;
+    delta.delta_control_variate = true;
+
+    const auto a = monte_carlo(kCall, kMkt, spot);
+    const auto b = monte_carlo(kCall, kMkt, delta);
+    // The hedge control is the payoff minus its replicating portfolio, so what
+    // is left is the hedging error. Theory says beta lands on 1.
+    const bool beta_is_one = std::fabs(b.beta_delta - 1.0) < 0.1;
+    check("The delta-hedge control beats the terminal-spot control, at beta = 1",
+          b.standard_error < 0.5 * a.standard_error && beta_is_one,
+          "spot control " + std::to_string(a.standard_error) + " against delta control "
+              + std::to_string(b.standard_error) + ", fitted beta "
+              + std::to_string(b.beta_delta));
+}
+
+void test_conditioning_shrinks_the_variance_monotonically() {
+    std::vector<double> ses;
+    for (double f : {1.0, 0.5, 0.25, 0.1}) {
+        auto cfg = plain_mc(200000);
+        cfg.conditional_fraction = f;
+        ses.push_back(monte_carlo(kCall, kMkt, cfg).standard_error);
+    }
+    bool falling = true;
+    for (std::size_t i = 1; i < ses.size(); ++i) {
+        if (!(ses[i] < ses[i - 1])) falling = false;
+    }
+    // The limit of the sequence: condition away every bit of randomness and
+    // the estimator is the closed form, with no standard error at all.
+    auto none = plain_mc(200000);
+    none.conditional_fraction = 0.0;
+    const auto limit = monte_carlo(kCall, kMkt, none);
+    const double exact = analytic_price(kCall, kMkt);
+    const bool collapses = limit.standard_error == 0.0 && std::fabs(limit.price - exact) < 1e-12;
+
+    check("Conditioning cuts the variance, and conditioning fully collapses it",
+          falling && collapses,
+          "s.e. " + std::to_string(ses[0]) + " -> " + std::to_string(ses.back())
+              + " as t_c falls to T/10, and exactly 0 at t_c = 0");
+}
+
+void test_stacking_reductions_compounds_them() {
+    const auto base = monte_carlo(kCall, kMkt, plain_mc(200000));
+    auto all = plain_mc(200000);
+    all.steps = 16;
+    all.antithetic = true;
+    all.control_variate = true;
+    all.delta_control_variate = true;
+    all.stratified = true;
+    all.conditional_fraction = 0.5;
+    const auto stacked = monte_carlo(kCall, kMkt, all);
+    const double factor = base.standard_error / stacked.standard_error;
+    const double exact = analytic_price(kCall, kMkt);
+    check("Stacked reductions compound, and the tight interval still covers the truth",
+          factor > 20.0 && stacked.ci_low() <= exact && exact <= stacked.ci_high(),
+          "standard error cut by a factor of " + std::to_string(factor) + " to "
+              + std::to_string(stacked.standard_error) + ", interval ["
+              + std::to_string(stacked.ci_low()) + ", " + std::to_string(stacked.ci_high()) + "]");
+}
+
+void test_inverse_normal_inverts_the_normal() {
+    // Stratification is only as good as the quantile function underneath it.
+    double worst = 0.0;
+    for (int i = 1; i < 100000; ++i) {
+        const double p = static_cast<double>(i) / 100000.0;
+        worst = std::fmax(worst, std::fabs(norm_cdf(detail::inv_norm_cdf(p)) - p));
+    }
+    check("The quantile function stratification relies on inverts the normal CDF",
+          worst < 1e-14, "worst absolute error over 10^5 probabilities is "
+                             + std::to_string(worst));
+}
+
 }  // namespace
 
 int main() {
@@ -375,6 +636,16 @@ int main() {
     test_monte_carlo_interval_covers_truth();
     test_euler_is_biased_and_milstein_less_so();
     test_american_rejected_by_monte_carlo();
+    test_scheme_inconsistent_reductions_are_refused();
+    test_degenerate_control_is_dropped_not_divided_by();
+    test_every_reduction_is_unbiased();
+    test_reported_standard_error_is_honest();
+    test_moment_matching_is_the_biased_one();
+    test_importance_sampling_rescues_the_tail();
+    test_delta_control_beats_the_spot_control();
+    test_conditioning_shrinks_the_variance_monotonically();
+    test_stacking_reductions_compounds_them();
+    test_inverse_normal_inverts_the_normal();
 
     std::printf("\n%d/%d checks passed\n", g_passed, g_passed + g_failed);
     return g_failed == 0 ? 0 : 1;

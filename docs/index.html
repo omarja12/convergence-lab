@@ -208,7 +208,7 @@ cfg.rannacher_steps = 0;   // 2 by default</code></pre>
   <div class="section-rule"></div>
 
   <pre><code>cmake -B build -DCMAKE_BUILD_TYPE=Release && cmake --build build
-./build/convergence_tests      # 18 checks
+./build/convergence_tests      # 28 checks
 ./build/convergence_demo       # prices one contract every way, with errors</code></pre>
 
   <p>Header-only, no dependency beyond a C++20 compiler. Without CMake, <code>build.sh</code> and <code>build.bat</code> do the same job. Every figure and every point on this page is emitted by <code>tools/convergence_study.cpp</code> into <a href="convergence.csv">convergence.csv</a> and plotted from that file, so nothing shown here is a number typed in by hand.</p>

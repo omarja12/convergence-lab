@@ -21,7 +21,7 @@ Finite difference (space),200,3.249225476768e-03
 P1 finite elements,200,1.177449686157e-03
 Finite difference (space),400,8.116393746391e-04
 P1 finite elements,400,2.943889073066e-04
-Monte Carlo std. error,2000,3.334801307086e-01
-Monte Carlo std. error,8000,1.635162338778e-01
-Monte Carlo std. error,32000,8.268756400167e-02
-Monte Carlo std. error,128000,4.107061226169e-02
+Monte Carlo std. error,2000,3.252803927427e-01
+Monte Carlo std. error,8000,1.622205672883e-01
+Monte Carlo std. error,32000,8.192742812620e-02
+Monte Carlo std. error,128000,4.113293446468e-02
