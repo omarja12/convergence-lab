@@ -22,6 +22,8 @@
   --serif: ui-serif, Georgia, "Times New Roman", serif;
   --gutter: 24px;
   --radius: 8px;
+  --code-bg: #1a2332;
+  --code-ink: #44546a;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -38,6 +40,8 @@
     --accent: #60a5fa;
     --accent-soft: #1e3a5f;
     --accent-bg: #1e293b;
+    --code-bg: #1e3a5f;
+    --code-ink: #bcd2ee;
   }
 }
 :root[data-theme="dark"] {
@@ -53,6 +57,8 @@
   --accent: #60a5fa;
   --accent-soft: #1e3a5f;
   --accent-bg: #1e293b;
+  --code-bg: #1e3a5f;
+  --code-ink: #bcd2ee;
 }
 
 * { box-sizing: border-box; }
@@ -270,8 +276,8 @@ body {
 pre {
   margin: 18px 0 0;
   padding: 16px 18px;
-  background: var(--ink);
-  color: var(--ink-mid);
+  background: var(--code-bg);
+  color: var(--code-ink);
   border-radius: var(--radius);
   overflow-x: auto;
   font-family: var(--mono);
