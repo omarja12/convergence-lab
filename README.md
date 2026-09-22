@@ -326,10 +326,14 @@ docs/                                      project page, plotted from convergenc
 ## References
 
 - Black, F. and Scholes, M. (1973). *The Pricing of Options and Corporate Liabilities.*
+- Lamberton, D. and Lapeyre, B. (1996). *Introduction to Stochastic Calculus Applied to Finance.*
 - Cox, J., Ross, S. and Rubinstein, M. (1979). *Option Pricing: A Simplified Approach.*
 - Boyle, P. (1986). *Option Valuation Using a Three-Jump Process.*
+- Ciarlet, P.G. (1978). *The Finite Element Method for Elliptic Problems.*
+- Achdou, Y. and Pironneau, O. (2005). *Computational Methods for Option Pricing.*
 - Rannacher, R. (1984). *Finite element solution of diffusion problems with irregular data.*
 - Giles, M. and Carter, R. (2006). *Convergence analysis of Crank–Nicolson and Rannacher time-marching.*
+- Talay, D. and Tubaro, L. (1990). *Expansion of the global error for numerical schemes solving stochastic differential equations.*
 
 ## Licence
 
