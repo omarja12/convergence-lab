@@ -278,7 +278,7 @@ pre {
   font-size: 0.78rem;
   line-height: 1.6;
 }
-pre code {
+.article pre code {
   background: none;
   border: 0;
   padding: 0;
